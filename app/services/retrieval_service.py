@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from typing import Any, Dict, List, Optional
 
 from app.core import logging
@@ -8,13 +7,13 @@ from app.retrieval.embedder import Embedder
 from app.retrieval.evidence_builder import EvidenceBuilder
 from app.retrieval.hybrid_retriever import HybridRetriever
 from app.retrieval.reranker import Reranker
-from app.retrieval.sparse_encoder import SparseEncoder
+from app.retrieval.bm25_index import BM25Index
 from app.retrieval.sparse_retriever import SparseRetriever
-from app.retrieval.vector_store import VectorStore
-
+from app.retrieval.store_factory import get_vector_store
+from app.retrieval.base_store import BaseVectorStore
+from app.retrieval.cross_encoder_reranker import CrossEncoderReranker
 
 logger = logging.logger.getChild("retrieval_service")
-
 
 class RetrievalService:
     """
@@ -25,35 +24,44 @@ class RetrievalService:
     def __init__(
         self,
         retriever: Optional[HybridRetriever] = None,
-        reranker: Optional[Reranker] = None,
+        reranker: Any = None,
         evidence_builder: Optional[EvidenceBuilder] = None,
         embedder: Optional[Embedder] = None,
-        vector_store: Optional[VectorStore] = None,
-        sparse_encoder: Optional[SparseEncoder] = None,
+        vector_store: Optional[BaseVectorStore] = None,
+        bm25_index: Optional[BM25Index] = None,
     ) -> None:
         self.embedder = embedder or Embedder()
-        self.vector_store = vector_store or VectorStore(collection_name="tutorrag_chunks")
-        self.sparse_encoder = sparse_encoder or SparseEncoder()
+        self.vector_store = vector_store or get_vector_store()
+        self.bm25_index = bm25_index or BM25Index()
 
         dense_retriever = DenseRetriever(
             embedder=self.embedder,
             vector_store=self.vector_store,
         )
         sparse_retriever = SparseRetriever(
-            encoder=self.sparse_encoder,
-            vector_store=self.vector_store,
+            bm25_index=self.bm25_index,
         )
 
         self.retriever = retriever or HybridRetriever(
             dense_retriever=dense_retriever,
             sparse_retriever=sparse_retriever,
         )
-        self.reranker = reranker or Reranker()
+        
+        if reranker:
+            self.reranker = reranker
+        else:
+            cross_encoder = CrossEncoderReranker()
+            if cross_encoder.model is not None:
+                self.reranker = cross_encoder
+            else:
+                logger.info("Falling back to deterministic lexical Reranker.")
+                self.reranker = Reranker()
+
         self.evidence_builder = evidence_builder or EvidenceBuilder()
 
     async def index_chunks(self, document_id: str, chunks: List[Any]) -> int:
         """
-        Generate dense and sparse representations and store them in the vector store.
+        Generate dense representations for DB and update BM25 index on RAM.
         """
         texts: List[str] = []
         normalized_chunks: List[Any] = []
@@ -70,9 +78,9 @@ class RetrievalService:
         if not normalized_chunks:
             return 0
 
+        # 1. Tạo Dense Vector và đưa vào VectorStore (Qdrant/In-Memory)
         dense_vectors = self.embedder.embed(texts)
-        sparse_vectors = self.sparse_encoder.encode_batch(texts)
-
+        
         for chunk in normalized_chunks:
             if hasattr(chunk, "metadata"):
                 chunk.metadata.setdefault("document_id", document_id)
@@ -83,8 +91,12 @@ class RetrievalService:
         self.vector_store.upsert_chunks(
             chunks=normalized_chunks,
             dense_vectors=dense_vectors,
-            sparse_vectors=sparse_vectors,
+            sparse_vectors=None, # Không cần lưu sparse vector nữa do BM25 quản lý riêng
         )
+        
+        # 2. Cập nhật tập BM25
+        self.bm25_index.add_chunks(normalized_chunks)
+
         return len(normalized_chunks)
 
     def retrieve_and_build_evidence(
@@ -93,9 +105,7 @@ class RetrievalService:
         filters: Optional[Dict[str, Any]] = None,
         top_k: int = 5,
     ) -> List[Any]:
-        """
-        Execute the full retrieval workflow and return evidence items.
-        """
+        
         if isinstance(query, str):
             query_text = query.strip()
         else:
@@ -111,6 +121,7 @@ class RetrievalService:
             top_k=max(top_k * 2, top_k),
             filters=filters or {},
         )
+        
         if not raw_candidates:
             return []
 

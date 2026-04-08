@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     VECTOR_STORE_PORT: int = 6333
     VECTOR_STORE_API_KEY: Optional[str] = None
 
+    # LLM Configuration (Default to local Ollama)
+    LLM_API_KEY: str = "ollama" 
+    LLM_BASE_URL: str = "http://localhost:11434/v1"
+    LLM_MODEL: str = "gemma4" 
+
     # General
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "dev-secret-key"

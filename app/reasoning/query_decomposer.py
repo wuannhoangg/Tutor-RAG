@@ -1,13 +1,13 @@
-"""
-Deterministic query decomposition for complex user queries.
-"""
-
 from __future__ import annotations
 
 import re
-from typing import List
+import json
+import asyncio
+from typing import List, Optional
 
-from .query_classifier import classify_query
+from app.core.llm_client import LLMClient
+from app.prompts.reasoning_prompts import build_query_decomposer_prompt
+from .query_classifier import _classify_query_deterministic
 
 
 def _clean(text: str) -> str:
@@ -34,9 +34,7 @@ def _extract_comparison_pair(query: str) -> tuple[str, str] | tuple[None, None]:
         r"khác nhau giữa\s+(.+?)\s+và\s+(.+)",
         r"(.+?)\s+(?:vs|versus)\s+(.+)",
     ]
-
     cleaned = _clean(query)
-
     for pattern in patterns:
         match = re.search(pattern, cleaned, flags=re.IGNORECASE)
         if match:
@@ -44,34 +42,30 @@ def _extract_comparison_pair(query: str) -> tuple[str, str] | tuple[None, None]:
             right = _clean(match.group(2))
             if left and right:
                 return left, right
-
     return None, None
 
 
-def decompose_query(query: str) -> List[str]:
-    """
-    Break a complex query into smaller retrievable sub-questions.
-    """
+def _decompose_query_deterministic(query: str) -> List[str]:
+    """Fallback logic when LLM is unavailable."""
     cleaned = _clean(query)
     if not cleaned:
         return []
 
-    label = classify_query(cleaned)
+    # Sử dụng hàm deterministic gốc để tránh đụng Task async
+    label = _classify_query_deterministic(cleaned)["label"]
 
     if label != "DECOMPOSITION_REQUIRED":
         return [cleaned]
 
     left, right = _extract_comparison_pair(cleaned)
     if left and right:
-        return _dedupe_keep_order(
-            [
-                f"What is {left}?",
-                f"What is {right}?",
-                f"What are the defining properties of {left}?",
-                f"What are the defining properties of {right}?",
-                f"What are the key differences between {left} and {right}?",
-            ]
-        )
+        return _dedupe_keep_order([
+            f"What is {left}?",
+            f"What is {right}?",
+            f"What are the defining properties of {left}?",
+            f"What are the defining properties of {right}?",
+            f"What are the key differences between {left} and {right}?",
+        ])
 
     parts = re.split(r"\?+|;+|\b(?:and|và|đồng thời)\b", cleaned, flags=re.IGNORECASE)
     parts = [_clean(part) for part in parts if _clean(part)]
@@ -80,25 +74,57 @@ def decompose_query(query: str) -> List[str]:
         return _dedupe_keep_order(parts[:5])
 
     lower = cleaned.lower()
-
     if "why" in lower or "tại sao" in lower:
-        return _dedupe_keep_order(
-            [
-                f"What concepts are involved in: {cleaned}?",
-                f"What evidence in the material explains: {cleaned}?",
-                f"What supporting details or conditions are mentioned for: {cleaned}?",
-            ]
-        )
+        return _dedupe_keep_order([
+            f"What concepts are involved in: {cleaned}?",
+            f"What evidence in the material explains: {cleaned}?",
+            f"What supporting details or conditions are mentioned for: {cleaned}?",
+        ])
 
     if "how" in lower or "như thế nào" in lower:
-        return _dedupe_keep_order(
-            [
-                f"What are the main concepts required to answer: {cleaned}?",
-                f"What steps or process details are mentioned for: {cleaned}?",
-                f"What evidence in the material supports the process for: {cleaned}?",
-            ]
-        )
+        return _dedupe_keep_order([
+            f"What are the main concepts required to answer: {cleaned}?",
+            f"What steps or process details are mentioned for: {cleaned}?",
+            f"What evidence in the material supports the process for: {cleaned}?",
+        ])
 
-    return [
-        cleaned,
+    return [cleaned]
+
+
+async def decompose_query_async(query: str, user_api_key: Optional[str] = None) -> List[str]:
+    """Try LLM first for intelligent decomposition."""
+    cleaned = _clean(query)
+    if not cleaned:
+        return []
+
+    client = LLMClient(user_api_key=user_api_key)
+    prompt = build_query_decomposer_prompt(query=cleaned)
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant that outputs strictly in JSON."},
+        {"role": "user", "content": prompt}
     ]
+
+    llm_response = await client.chat(messages=messages, temperature=0.0, json_mode=True)
+    
+    if llm_response:
+        try:
+            result = json.loads(llm_response)
+            if "sub_questions" in result:
+                return result["sub_questions"]
+        except json.JSONDecodeError:
+            pass
+
+    return _decompose_query_deterministic(query)
+
+
+def decompose_query(query: str, user_api_key: Optional[str] = None) -> List[str]:
+    """Synchronous wrapper for backward compatibility."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        return loop.create_task(decompose_query_async(query, user_api_key))
+    else:
+        return asyncio.run(decompose_query_async(query, user_api_key))

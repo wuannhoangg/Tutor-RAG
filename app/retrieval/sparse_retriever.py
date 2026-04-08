@@ -1,19 +1,13 @@
-from __future__ import annotations
-
 from typing import Any, Dict, List, Optional
-
-from app.retrieval.sparse_encoder import SparseEncoder
-from app.retrieval.vector_store import VectorStore
-
+from app.retrieval.bm25_index import BM25Index
 
 class SparseRetriever:
     """
-    Sparse lexical retrieval.
+    Sparse lexical retrieval using BM25.
     """
 
-    def __init__(self, encoder: SparseEncoder, vector_store: VectorStore) -> None:
-        self.encoder = encoder
-        self.vector_store = vector_store
+    def __init__(self, bm25_index: BM25Index) -> None:
+        self.bm25_index = bm25_index
 
     def retrieve(
         self,
@@ -24,9 +18,8 @@ class SparseRetriever:
         if not query_text.strip():
             return []
 
-        query_sparse = self.encoder.encode(query_text)
-        return self.vector_store.search_sparse(
-            query_sparse=query_sparse,
+        return self.bm25_index.search(
+            query_text=query_text,
             top_k=top_k,
             filters=filters or {},
         )
