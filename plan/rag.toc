@@ -1,0 +1,33 @@
+\xpg@aux {}{vietnamese}
+\contentsline {section}{\numberline {1}Tổng quan bài toán}{3}{section.1}%
+\contentsline {section}{\numberline {2}Bức tranh toàn bộ pipeline}{3}{section.2}%
+\contentsline {section}{\numberline {3}Chuẩn đầu vào và đầu ra cần thống nhất từ đầu}{5}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Đầu vào gốc của toàn hệ thống}{5}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Đầu ra cuối cùng của toàn hệ thống}{5}{subsection.3.2}%
+\contentsline {section}{\numberline {4}Giai đoạn A -- Khởi tạo bài toán và thiết kế nền tảng}{5}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Cấu trúc dự án dự kiến trên GitHub}{9}{subsection.4.1}%
+\contentsline {section}{\numberline {5}Giai đoạn B -- Xây dựng knowledge base từ tài liệu gốc}{18}{section.5}%
+\contentsline {section}{\numberline {6}Giai đoạn C -- Làm knowledge base thông minh hơn vector search thuần túy}{23}{section.6}%
+\contentsline {section}{\numberline {7}Giai đoạn D -- Online pipeline cho câu hỏi có suy luận}{26}{section.7}%
+\contentsline {section}{\numberline {8}Giai đoạn E -- Orchestration, API, đánh giá và triển khai}{32}{section.8}%
+\contentsline {section}{\numberline {9}Mối liên hệ input-output giữa các bước}{34}{section.9}%
+\contentsline {subsection}{\numberline {9.1}Chuỗi offline}{34}{subsection.9.1}%
+\contentsline {subsection}{\numberline {9.2}Chuỗi online}{34}{subsection.9.2}%
+\contentsline {section}{\numberline {10}Kế hoạch triển khai đề xuất theo tuần}{35}{section.10}%
+\contentsline {section}{\numberline {11}Definition of Done cho từng lớp hệ thống}{35}{section.11}%
+\contentsline {subsection}{\numberline {11.1}Offline ingestion hoàn thành khi nào?}{35}{subsection.11.1}%
+\contentsline {subsection}{\numberline {11.2}Retrieval hoàn thành khi nào?}{35}{subsection.11.2}%
+\contentsline {subsection}{\numberline {11.3}Reasoning pipeline hoàn thành khi nào?}{36}{subsection.11.3}%
+\contentsline {section}{\numberline {12}Những lỗi kiến trúc thường gặp cần tránh}{36}{section.12}%
+\contentsline {section}{\numberline {13}Điều chỉnh kỹ thuật mở rộng theo góp ý triển khai}{36}{section.13}%
+\contentsline {subsection}{\numberline {13.1}Điều chỉnh cho Bước 5 và Bước 6 -- Parsing và Normalize}{36}{subsection.13.1}%
+\contentsline {subsection}{\numberline {13.2}Điều chỉnh cho Bước 11 và Bước 12 -- Concept index, relation graph và hướng GraphRAG}{37}{subsection.13.2}%
+\contentsline {subsection}{\numberline {13.3}Điều chỉnh cho Bước 15, Bước 16 và Bước 17 -- Agentic AI và ReAct planner}{38}{subsection.13.3}%
+\contentsline {subsection}{\numberline {13.4}Điều chỉnh cho Bước 20 và Bước 23 -- Verification, Self-RAG và Ragas}{38}{subsection.13.4}%
+\contentsline {subsection}{\numberline {13.5}Các thách thức đặc thù với dữ liệu Bách Khoa và tiếng Việt}{39}{subsection.13.5}%
+\contentsline {section}{\numberline {14}Phụ lục A -- Data contracts khuyến nghị}{40}{section.14}%
+\contentsline {subsection}{\numberline {14.1}QueryAnalysis}{40}{subsection.14.1}%
+\contentsline {subsection}{\numberline {14.2}EvidenceItem}{40}{subsection.14.2}%
+\contentsline {subsection}{\numberline {14.3}FinalAnswer}{40}{subsection.14.3}%
+\contentsline {section}{\numberline {15}Phụ lục B -- Skeleton codebase nên có}{41}{section.15}%
+\contentsline {section}{\numberline {16}Kết luận}{42}{section.16}%

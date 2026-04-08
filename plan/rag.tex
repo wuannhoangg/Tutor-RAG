@@ -1,0 +1,1536 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[a4paper,margin=2.2cm]{geometry}
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setmainlanguage{vietnamese}
+\setmainfont{DejaVu Serif}
+\setsansfont{DejaVu Sans}
+\setmonofont{DejaVu Sans Mono}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsmath,amssymb}
+\usepackage{tcolorbox}
+\tcbuselibrary{breakable,skins}
+\usepackage{listings}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{setspace}
+\usepackage{graphicx}
+
+\definecolor{Primary}{HTML}{1F4E79}
+\definecolor{PrimaryLight}{HTML}{EAF3FA}
+\definecolor{Accent}{HTML}{0E7490}
+\definecolor{SoftGray}{HTML}{F6F8FA}
+\definecolor{Border}{HTML}{D6DEE6}
+\definecolor{CodeBg}{HTML}{F7F7F7}
+\definecolor{Warn}{HTML}{8A4B08}
+\definecolor{WarnBg}{HTML}{FFF4E5}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=Primary,
+    urlcolor=Accent,
+    pdftitle={Huong dan chi tiet xay dung he thong TutorRAG},
+    pdfauthor={OpenAI}
+}
+
+\setstretch{1.15}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\setlength{\headheight}{16pt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\textit{TutorRAG -- Tài liệu triển khai chi tiết}}
+\fancyhead[R]{\thepage/\pageref{LastPage}}
+\fancyfoot[C]{}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\titleformat{\section}{\Large\bfseries\color{Primary}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\large\bfseries\color{Primary}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{Accent}}{\thesubsubsection}{0.6em}{}
+
+\newtcolorbox{overviewbox}{
+  breakable,
+  colback=PrimaryLight,
+  colframe=Primary,
+  boxrule=0.7pt,
+  arc=2mm,
+  left=2mm,right=2mm,top=1.2mm,bottom=1.2mm
+}
+
+\newtcolorbox{stepbox}[2][]{
+  breakable,
+  enhanced,
+  colback=white,
+  colframe=Primary,
+  title={#2},
+  fonttitle=\bfseries,
+  coltitle=white,
+  colbacktitle=Primary,
+  boxrule=0.7pt,
+  arc=2mm,
+  left=2mm,right=2mm,top=1.5mm,bottom=1.5mm,
+  #1
+}
+
+\newtcolorbox{warningbox}{
+  breakable,
+  colback=WarnBg,
+  colframe=Warn,
+  boxrule=0.6pt,
+  arc=2mm,
+  left=2mm,right=2mm,top=1.2mm,bottom=1.2mm
+}
+
+\lstdefinestyle{customcode}{
+  backgroundcolor=\color{CodeBg},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{Border},
+  showstringspaces=false,
+  columns=fullflexible
+}
+\lstset{style=customcode}
+
+\newcommand{\stepgoal}[1]{\textbf{Mục tiêu của bước:} #1\\}
+\newcommand{\stepinput}[1]{\textbf{Input:} #1\\}
+\newcommand{\stepprocess}[1]{\textbf{Xử lý chính:} #1\\}
+\newcommand{\stepoutput}[1]{\textbf{Output:} #1\\}
+\newcommand{\stepnext}[1]{\textbf{Output này trở thành input cho:} #1\\}
+\newcommand{\stepmodules}[1]{\textbf{Module / file nên có:} #1\\}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    \vspace*{1.5cm}
+    {\Huge\bfseries\color{Primary} HƯỚNG DẪN CHI TIẾT TRIỂN KHAI\\[0.3em]
+    HỆ THỐNG TUTORRAG CHO NGƯỜI TỰ HỌC\par}
+    \vspace{1cm}
+    {\Large Từ tài liệu học tập thô đến hệ thống Grounded Reasoning RAG hoàn chỉnh\par}
+    \vspace{1.2cm}
+    \begin{overviewbox}
+    \textbf{Mục tiêu tài liệu}\newline
+    Tài liệu này mô tả \textbf{từng bước, từng đầu vào, từng đầu ra} để xây dựng một hệ thống RAG có khả năng \textbf{truy hồi, tổng hợp và suy luận dựa trên bằng chứng} từ tài liệu học tập cá nhân của người tự học. Trọng tâm là làm rõ:\newline
+    - Bước nào cần dữ liệu gì.\newline
+    - Bước đó xử lý chính xác điều gì.\newline
+    - Output có dạng gì.\newline
+    - Output ấy được đưa sang bước tiếp theo như thế nào.\newline
+    - Những module nào nên xuất hiện trong codebase.
+    \end{overviewbox}
+    \vfill
+    {\large Phiên bản: 1.0\\[0.25em]
+    Định dạng biên dịch khuyến nghị: \texttt{XeLaTeX}}
+    \vspace{1cm}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Tổng quan bài toán}
+
+Bạn không xây một chatbot chỉ biết nhắc lại tài liệu. Bạn đang xây một \textbf{trợ lý tự học có suy luận dựa trên tài liệu cá nhân}. Điều này có nghĩa là hệ thống phải làm được bốn việc đồng thời:
+\begin{enumerate}[label=\arabic*.]
+    \item Lưu trữ và quản lý tài liệu học tập theo môn, chương, loại tài liệu.
+    \item Truy hồi đúng những đoạn liên quan đến câu hỏi hiện tại.
+    \item Kết nối nhiều đoạn làm bằng chứng để suy luận, so sánh, giải thích \textit{why/how}.
+    \item Trả lời có trích nguồn, có kiểm tra lại độ bám sát evidence, không nói tự do ngoài tài liệu.
+\end{enumerate}
+
+\begin{overviewbox}
+\textbf{Nguyên tắc thiết kế cốt lõi}\newline
+\textbf{Grounded first, reasoning second.} Nghĩa là hệ thống chỉ được suy luận \textit{trên} bằng chứng đã truy hồi, không được tưởng tượng thêm tri thức nếu tài liệu không hỗ trợ.\newline
+\textbf{Pipeline hai miền.} Một miền là \textbf{offline ingestion/indexing}; miền còn lại là \textbf{online query/reasoning}.\newline
+\textbf{Mọi bước đều có contract dữ liệu rõ ràng.} Không truyền dữ liệu mơ hồ giữa các module.
+\end{overviewbox}
+
+\section{Bức tranh toàn bộ pipeline}
+
+\begin{longtable}{p{0.07\textwidth}p{0.23\textwidth}p{0.31\textwidth}p{0.31\textwidth}}
+\toprule
+\textbf{Bước} & \textbf{Tên bước} & \textbf{Input chính} & \textbf{Output chính} \\
+\midrule
+\endhead
+1 & Xác định phạm vi sản phẩm & Mục tiêu đề tài, user persona, loại môn học & Bộ yêu cầu chức năng, use case, non-functional requirements \\
+2 & Thiết kế mô hình dữ liệu & Use case bước 1 & Schema cho document, chunk, query, answer, feedback \\
+3 & Thiết kế cấu trúc thư mục và hạ tầng & Schema + chọn stack & Project skeleton, storage layout, service map \\
+4 & Upload và lưu file gốc & PDF/DOCX/PPTX/TXT từ người dùng & File gốc + metadata document ban đầu \\
+5 & Parse tài liệu & File gốc + metadata document & Văn bản thô theo trang/khối/heading \\
+6 & Normalize nội dung & Văn bản parse được & Nội dung sạch, bỏ nhiễu, giữ cấu trúc học thuật \\
+7 & Chunking theo cấu trúc & Nội dung sạch & Danh sách chunk có ranh giới hợp lý \\
+8 & Gắn metadata chunk & Chunks + document metadata & Chunk records đầy đủ metadata \\
+9 & Tạo vector dense & Chunk records & Dense embeddings \\
+10 & Tạo chỉ mục sparse & Chunk records & Sparse vectors / BM25 features \\
+11 & Xây concept index & Chunk records & Tập khái niệm, định nghĩa, từ khóa học thuật \\
+12 & Xây relation graph & Concept index + chunks & Đồ thị quan hệ khái niệm / prerequisite / minh họa \\
+13 & Upsert vào vector DB & Dense + sparse + metadata & Collection truy hồi hoàn chỉnh \\
+14 & Nhận query online & User question + session context & Query request chuẩn hóa \\
+15 & Query understanding & Query request & Query type, intent, subject filter, độ khó \\
+16 & Query decomposition & Query type + query gốc & Danh sách sub-question / sub-query \\
+17 & Hybrid retrieval nhiều vòng & Sub-query + indexes & Danh sách candidate evidence \\
+18 & Merge, dedupe, rerank & Candidate evidence & Evidence set xếp hạng cao \\
+19 & Reasoning synthesis & Evidence set + question & Câu trả lời sơ bộ + claims + citations \\
+20 & Verification & Draft answer + evidence set & Final answer đã kiểm tra support \\
+21 & Logging và feedback & Final answer + hành vi user & Bản ghi đánh giá phiên hỏi đáp \\
+22 & API và orchestration & Toàn bộ modules ở trên & Dịch vụ backend chạy được \\
+23 & Evaluation & Bộ câu hỏi chuẩn + logs & Báo cáo chất lượng retrieval/reasoning \\
+24 & Deployment & Ứng dụng hoàn chỉnh & Môi trường triển khai local/staging/production \\
+\bottomrule
+\end{longtable}
+
+\section{Chuẩn đầu vào và đầu ra cần thống nhất từ đầu}
+
+\subsection{Đầu vào gốc của toàn hệ thống}
+\begin{itemize}
+    \item Tài liệu học tập: PDF, DOCX, PPTX, Markdown, TXT.
+    \item Metadata do người dùng hoặc hệ thống cung cấp: môn học, tên tài liệu, loại tài liệu, ngôn ngữ.
+    \item Câu hỏi của user: một truy vấn ngôn ngữ tự nhiên, có thể kèm theo ngữ cảnh phiên học.
+\end{itemize}
+
+\subsection{Đầu ra cuối cùng của toàn hệ thống}
+\begin{itemize}
+    \item Một câu trả lời dễ hiểu, có suy luận dựa trên evidence.
+    \item Danh sách trích dẫn nguồn: tài liệu, trang, chunk.
+    \item Chỉ số tin cậy nội bộ và logs để đánh giá sau này.
+\end{itemize}
+
+\section{Giai đoạn A -- Khởi tạo bài toán và thiết kế nền tảng}
+
+\begin{stepbox}{Bước 1. Xác định phạm vi sản phẩm và kịch bản sử dụng}
+\stepgoal{Biến ý tưởng mơ hồ ``làm RAG cho người tự học'' thành một bài toán sản phẩm cụ thể, có tiêu chí hoàn thành rõ ràng.}
+\stepinput{Mô tả đề tài, đối tượng người dùng, loại tài liệu mà user có, dạng câu hỏi mà hệ thống cần trả lời.}
+\stepprocess{Xác định user persona, mô tả 5--10 use case cốt lõi, chốt rõ hệ thống có nhiệm vụ \textbf{truy hồi + suy luận + trích nguồn} thay vì chỉ tóm tắt.}
+\stepoutput{Tài liệu yêu cầu gồm: danh sách chức năng, giới hạn hệ thống, non-functional requirements như độ trễ, khả năng mở rộng, khả năng giải thích.}
+\stepnext{Bước 2 -- Thiết kế schema dữ liệu.}
+\stepmodules{\texttt{docs/problem\_statement.md}, \texttt{docs/use\_cases.md}, \texttt{docs/requirements.md}}
+
+\textbf{Các việc phải làm cụ thể}
+\begin{enumerate}[label=\arabic*.]
+    \item Xác định rõ hệ thống phục vụ ai: sinh viên đại học, học sinh, người tự học nhiều môn, người ôn thi.
+    \item Viết danh sách use case. Ví dụ:
+    \begin{itemize}
+        \item Hỏi định nghĩa một khái niệm.
+        \item So sánh hai khái niệm giữa hai chương.
+        \item Hỏi tại sao lời giải trong tài liệu lại chọn phương pháp A thay vì B.
+        \item Yêu cầu tóm tắt một chương theo mức dễ hiểu.
+        \item Sinh câu hỏi ôn tập từ tài liệu đã học.
+    \end{itemize}
+    \item Xác định những gì hệ thống \textbf{không} làm ở phiên bản đầu. Ví dụ: chưa chấm bài tự luận dài, chưa truy cập web ngoài tài liệu cá nhân.
+    \item Chốt các tiêu chí chất lượng:
+    \begin{itemize}
+        \item Trích dẫn phải chỉ ra đúng tài liệu và trang.
+        \item Khi evidence không đủ, hệ thống phải nói ``chưa đủ bằng chứng''.
+        \item Truy hồi phải lọc theo đúng user và đúng môn học.
+    \end{itemize}
+\end{enumerate}
+
+\textbf{Mẫu output nên có}
+\begin{lstlisting}
+{
+  "product_goal": "Tro ly tu hoc co suy luan dua tren tai lieu ca nhan",
+  "users": ["student", "self-learner"],
+  "core_use_cases": [
+    "definition_qa",
+    "comparison_qa",
+    "why_reasoning",
+    "exercise_support",
+    "chapter_summary"
+  ],
+  "out_of_scope_v1": ["web_search", "grading_full_essay"],
+  "quality_rules": [
+    "every_major_claim_needs_support",
+    "answer_must_be_grounded",
+    "insufficient_context_must_be_explicit"
+  ]
+}
+\end{lstlisting}
+\end{stepbox}
+
+\begin{stepbox}{Bước 2. Thiết kế mô hình dữ liệu toàn hệ thống}
+\stepgoal{Tạo ra một data contract thống nhất để mọi module trao đổi dữ liệu rõ ràng, không hiểu khác nhau.}
+\stepinput{Yêu cầu sản phẩm từ bước 1.}
+\stepprocess{Thiết kế schema cho document, chunk, user query, query plan, evidence set, answer, feedback.}
+\stepoutput{Bộ schema JSON/Pydantic/ORM dùng xuyên suốt dự án.}
+\stepnext{Bước 3 -- Thiết kế project skeleton và hạ tầng.}
+\stepmodules{\texttt{app/schemas/*.py}, \texttt{docs/data\_contracts.md}, \texttt{app/db/models.py}}
+
+\textbf{Các entity bắt buộc nên có}
+\begin{itemize}
+    \item \textbf{Document}: đại diện cho một file tài liệu gốc.
+    \item \textbf{Chunk}: một đoạn nội dung đã chuẩn hóa, có metadata đầy đủ.
+    \item \textbf{Concept}: một khái niệm học thuật được trích ra từ chunk.
+    \item \textbf{QueryRequest}: gói thông tin truy vấn online.
+    \item \textbf{QueryPlan}: kế hoạch suy luận gồm type, sub-questions, filters.
+    \item \textbf{EvidenceItem}: bằng chứng được chọn sau retrieve và rerank.
+    \item \textbf{AnswerRecord}: câu trả lời cuối cùng và citations.
+    \item \textbf{FeedbackRecord}: phản hồi của user sau khi xem answer.
+\end{itemize}
+
+\textbf{Ví dụ schema document}
+\begin{lstlisting}
+{
+  "document_id": "doc_001",
+  "user_id": "user_001",
+  "subject": "database",
+  "title": "Normalization Slides",
+  "source_type": "slides",
+  "language": "vi",
+  "file_path": "storage/user_001/database/norm_slides.pdf",
+  "uploaded_at": "2026-04-05T10:00:00"
+}
+\end{lstlisting}
+
+\textbf{Ví dụ schema chunk}
+\begin{lstlisting}
+{
+  "chunk_id": "chunk_0001",
+  "document_id": "doc_001",
+  "user_id": "user_001",
+  "subject": "database",
+  "chapter": "Normalization",
+  "section": "BCNF",
+  "page_start": 12,
+  "page_end": 13,
+  "content_type": "definition",
+  "text": "...",
+  "token_count": 420,
+  "keywords": ["BCNF", "FD", "dependency preservation"]
+}
+\end{lstlisting}
+\end{stepbox}
+
+\begin{stepbox}{Bước 3. Thiết kế cấu trúc project, storage và service map}
+\stepgoal{Biến schema ở bước 2 thành một codebase có tổ chức, dễ mở rộng.}
+\stepinput{Schema dữ liệu, lựa chọn công nghệ, yêu cầu triển khai.}
+\stepprocess{Phân tách backend thành các module ingestion, retrieval, reasoning, verification, evaluation và API. Đồng thời quyết định nơi lưu file gốc, nơi lưu metadata, nơi lưu vector index.}
+\stepoutput{Project skeleton và sơ đồ dịch vụ.}
+\stepnext{Bước 4 -- Bắt đầu đường ống upload/lưu file gốc.}
+\stepmodules{\texttt{app/}, \texttt{storage/}, \texttt{scripts/}, \texttt{docker-compose.yml}, \texttt{README.md}}
+
+\textbf{Khuyến nghị cấu trúc thư mục}
+\begin{lstlisting}
+rag-learning-assistant/
+  app/
+    api/
+    core/
+    db/
+    ingestion/
+    retrieval/
+    reasoning/
+    verification/
+    evaluation/
+  storage/
+  scripts/
+  tests/
+  docs/
+  docker-compose.yml
+\end{lstlisting}
+
+\textbf{Service map tối thiểu}
+\begin{itemize}
+    \item \textbf{FastAPI}: phục vụ API.
+    \item \textbf{PostgreSQL hoặc SQLite}: lưu metadata và logs.
+    \item \textbf{Qdrant}: lưu vector dense/sparse và payload.
+    \item \textbf{File storage}: local hoặc MinIO/S3.
+\end{itemize}
+\end{stepbox}
+
+
+\subsection{Cấu trúc dự án dự kiến trên GitHub}
+
+Phần này mở rộng trực tiếp cho Bước 3. Mục tiêu là biến ``project skeleton'' ở mức ý tưởng thành một \textbf{repository GitHub có thể clone về và bắt đầu code ngay}. Cấu trúc dưới đây đi theo nguyên tắc tách rõ \textbf{miền nghiệp vụ}, \textbf{dịch vụ chạy nền}, \textbf{tài liệu kỹ thuật} và \textbf{hạ tầng triển khai}.
+
+\begin{stepbox}{Bổ sung cho Bước 3. Cấu trúc repository GitHub đề xuất}
+\stepgoal{Đưa ra một cấu trúc repository đủ chi tiết để nhóm phát triển có thể phân công việc, review code và triển khai CI/CD rõ ràng.}
+\stepinput{Schema dữ liệu, service map, pipeline ingestion và pipeline reasoning đã chốt ở các bước trước.}
+\stepprocess{Tách repository thành các lớp: ứng dụng chính, scripts vận hành, tài liệu thiết kế, test, cấu hình môi trường, và thư mục triển khai. Quy định rõ nơi đặt business logic, nơi đặt adapters cho database/vector store, nơi đặt prompt, và nơi đặt mã đánh giá.}
+\stepoutput{Một project tree chuẩn để đưa lên GitHub, kèm mô tả trách nhiệm từng thư mục và từng file quan trọng.}
+\stepnext{Các bước từ Bước 4 trở đi sẽ hiện thực hóa lần lượt các thư mục và file trong project tree này.}
+\stepmodules{\texttt{README.md}, \texttt{pyproject.toml} hoặc \texttt{requirements.txt}, \texttt{app/}, \texttt{scripts/}, \texttt{tests/}, \texttt{docs/}, \texttt{deploy/}, \texttt{docker-compose.yml}, \texttt{.env.example}, \texttt{.github/workflows/*.yml}}
+
+\textbf{Project tree đề xuất trên GitHub}
+\begin{lstlisting}
+tutorrag/
+  README.md
+  LICENSE
+  .gitignore
+  .env.example
+  pyproject.toml
+  requirements.txt
+  docker-compose.yml
+  Dockerfile
+
+  .github/
+    workflows/
+      ci.yml
+      lint.yml
+      test.yml
+
+  docs/
+    problem_statement.md
+    requirements.md
+    architecture.md
+    data_contracts.md
+    api_spec.md
+    evaluation_plan.md
+    deployment_guide.md
+    diagrams/
+      overall_pipeline.png
+      ingestion_pipeline.png
+      online_reasoning_pipeline.png
+
+  app/
+    main.py
+
+    api/
+      __init__.py
+      deps.py
+      routes_health.py
+      routes_documents.py
+      routes_chat.py
+      routes_search.py
+      routes_admin.py
+
+    core/
+      __init__.py
+      config.py
+      logging.py
+      constants.py
+      exceptions.py
+      security.py
+
+    schemas/
+      __init__.py
+      document.py
+      chunk.py
+      concept.py
+      query.py
+      evidence.py
+      answer.py
+      feedback.py
+
+    db/
+      __init__.py
+      session.py
+      base.py
+      models.py
+      repositories/
+        document_repo.py
+        chunk_repo.py
+        answer_repo.py
+        feedback_repo.py
+
+    storage/
+      __init__.py
+      file_manager.py
+      local_storage.py
+      s3_storage.py
+
+    ingestion/
+      __init__.py
+      loaders.py
+      parser_pdf.py
+      parser_docx.py
+      parser_pptx.py
+      cleaner.py
+      normalizer.py
+      chunker.py
+      metadata_builder.py
+      embedding_jobs.py
+      indexer.py
+
+    knowledge/
+      __init__.py
+      concept_extractor.py
+      concept_index.py
+      relation_graph.py
+      prerequisite_graph.py
+      keyword_registry.py
+
+    retrieval/
+      __init__.py
+      embedder.py
+      sparse_encoder.py
+      vector_store.py
+      metadata_filters.py
+      dense_retriever.py
+      sparse_retriever.py
+      hybrid_retriever.py
+      reranker.py
+      query_expander.py
+      query_classifier.py
+      query_decomposer.py
+      evidence_builder.py
+
+    prompts/
+      system_prompts.py
+      reasoning_prompts.py
+      verification_prompts.py
+      study_mode_prompts.py
+
+    reasoning/
+      __init__.py
+      planner.py
+      synthesizer.py
+      answer_generator.py
+      study_mode_router.py
+      citation_builder.py
+
+    verification/
+      __init__.py
+      claim_checker.py
+      support_checker.py
+      answer_verifier.py
+      hallucination_guard.py
+
+    services/
+      __init__.py
+      document_service.py
+      ingestion_service.py
+      retrieval_service.py
+      tutoring_service.py
+      evaluation_service.py
+
+    orchestration/
+      __init__.py
+      offline_pipeline.py
+      online_pipeline.py
+      job_dispatcher.py
+
+    evaluation/
+      __init__.py
+      dataset_builder.py
+      metrics.py
+      ragas_runner.py
+      benchmark.py
+      error_analysis.py
+
+    utils/
+      __init__.py
+      token_utils.py
+      text_utils.py
+      time_utils.py
+      id_utils.py
+
+  scripts/
+    ingest_folder.py
+    reindex_subject.py
+    rebuild_concepts.py
+    run_local_eval.py
+    export_test_dataset.py
+    bootstrap_dev.sh
+
+  tests/
+    conftest.py
+    unit/
+      test_chunker.py
+      test_query_classifier.py
+      test_retriever.py
+      test_reranker.py
+      test_answer_verifier.py
+    integration/
+      test_document_upload_api.py
+      test_ingestion_pipeline.py
+      test_online_pipeline.py
+    e2e/
+      test_user_question_flow.py
+
+  storage/
+    .gitkeep
+
+  data/
+    samples/
+      sample_notes/
+      sample_slides/
+      sample_exams/
+
+  notebooks/
+    retrieval_experiments.ipynb
+    embedding_analysis.ipynb
+    evaluation_debug.ipynb
+
+  deploy/
+    nginx.conf
+    qdrant/
+      collection_setup.json
+    postgres/
+      init.sql
+    systemd/
+      tutorrag.service
+\end{lstlisting}
+
+\textbf{Giải thích trách nhiệm từng thư mục chính}
+\begin{itemize}
+    \item \textbf{\texttt{app/}}: toàn bộ mã nguồn backend chính. Đây là trái tim của dự án.
+    \item \textbf{\texttt{app/api/}}: định nghĩa endpoint FastAPI. Thư mục này chỉ nên làm nhiệm vụ nhận request, validate sơ bộ, gọi service và trả response.
+    \item \textbf{\texttt{app/core/}}: cấu hình toàn cục, logging, constants, exception chuẩn. Không đặt business logic nặng ở đây.
+    \item \textbf{\texttt{app/schemas/}}: các Pydantic schema hoặc data models dùng để truyền dữ liệu giữa các tầng.
+    \item \textbf{\texttt{app/db/}}: ORM models, session và repository cho metadata database như PostgreSQL.
+    \item \textbf{\texttt{app/storage/}}: adapter lưu file gốc. Có thể bắt đầu bằng local storage, sau nâng lên S3/MinIO.
+    \item \textbf{\texttt{app/ingestion/}}: mọi logic offline từ parse, clean, chunk, build metadata đến index.
+    \item \textbf{\texttt{app/knowledge/}}: lớp tri thức bổ sung như concept index, relation graph, prerequisite graph.
+    \item \textbf{\texttt{app/retrieval/}}: dense retrieval, sparse retrieval, hybrid retrieval, metadata filter, query decomposition và evidence building.
+    \item \textbf{\texttt{app/prompts/}}: nơi quản lý prompt một cách tập trung để dễ versioning và review.
+    \item \textbf{\texttt{app/reasoning/}}: planner, synthesizer, answer generator; đây là tầng suy luận dựa trên evidence.
+    \item \textbf{\texttt{app/verification/}}: kiểm tra claim, support, citation và phát hiện câu trả lời vượt ra ngoài evidence.
+    \item \textbf{\texttt{app/services/}}: tầng service ghép business logic cho API gọi tới. Đây là nơi phối hợp nhiều module cùng lúc.
+    \item \textbf{\texttt{app/orchestration/}}: pipeline end-to-end, đặc biệt hữu ích khi bạn muốn một entry point rõ ràng cho offline ingestion và online reasoning.
+    \item \textbf{\texttt{app/evaluation/}}: mã đánh giá chất lượng retrieval, reasoning, grounding và benchmark.
+    \item \textbf{\texttt{scripts/}}: các lệnh tiện ích để vận hành, reindex, chạy evaluation, bootstrap môi trường dev.
+    \item \textbf{\texttt{tests/}}: toàn bộ test unit, integration và end-to-end.
+    \item \textbf{\texttt{docs/}}: tài liệu kỹ thuật để cả nhóm đọc trên GitHub mà không cần mở code.
+    \item \textbf{\texttt{deploy/}}: cấu hình triển khai thực tế như Nginx, PostgreSQL init script, systemd, Qdrant setup.
+    \item \textbf{\texttt{.github/workflows/}}: pipeline CI để lint, test và kiểm tra build mỗi khi push hoặc tạo pull request.
+\end{itemize}
+
+\textbf{Những file gốc nên có ngay từ commit đầu tiên}
+\begin{enumerate}[label=\arabic*.]
+    \item \texttt{README.md}: mô tả dự án, cách chạy local, kiến trúc tổng quan, roadmap.
+    \item \texttt{.env.example}: danh sách biến môi trường mẫu như database URL, Qdrant URL, API key.
+    \item \texttt{docker-compose.yml}: khởi tạo local stack gồm API, Qdrant, PostgreSQL.
+    \item \texttt{pyproject.toml} hoặc \texttt{requirements.txt}: quản lý dependency.
+    \item \texttt{docs/architecture.md}: sơ đồ ingest pipeline và online pipeline.
+    \item \texttt{tests/}: bộ test tối thiểu để chống gãy luồng chính khi refactor.
+\end{enumerate}
+
+\textbf{Nguyên tắc đặt code trong repository}
+\begin{itemize}
+    \item API layer không được chứa toàn bộ business logic.
+    \item Prompt không hard-code rải rác trong service hoặc route; phải gom vào thư mục \texttt{app/prompts/}.
+    \item Adapter cho Qdrant, PostgreSQL, storage phải được bọc trong module riêng để sau này thay thế công nghệ dễ hơn.
+    \item Retrieval logic và reasoning logic phải tách nhau; retrieval không tự sinh câu trả lời.
+    \item Verification phải là một bước độc lập thay vì trộn vào answer generator.
+\end{itemize}
+
+\textbf{Mapping giữa thư mục và pipeline nghiệp vụ}
+\begin{longtable}{p{0.28\textwidth}p{0.3\textwidth}p{0.32\textwidth}}
+\toprule
+\textbf{Giai đoạn nghiệp vụ} & \textbf{Thư mục chính} & \textbf{File tiêu biểu} \\
+\midrule
+\endhead
+Upload và lưu file gốc & \texttt{app/api}, \texttt{app/storage}, \texttt{app/db} & \texttt{routes\_documents.py}, \texttt{file\_manager.py}, \texttt{document\_repo.py} \\
+Parse, clean, chunk, index & \texttt{app/ingestion} & \texttt{parser\_pdf.py}, \texttt{cleaner.py}, \texttt{chunker.py}, \texttt{indexer.py} \\
+Trích concept và xây graph & \texttt{app/knowledge} & \texttt{concept\_extractor.py}, \texttt{relation\_graph.py} \\
+Hiểu truy vấn và retrieve & \texttt{app/retrieval} & \texttt{query\_classifier.py}, \texttt{hybrid\_retriever.py}, \texttt{reranker.py} \\
+Suy luận và sinh câu trả lời & \texttt{app/reasoning} & \texttt{synthesizer.py}, \texttt{answer\_generator.py}, \texttt{citation\_builder.py} \\
+Kiểm tra grounding & \texttt{app/verification} & \texttt{claim\_checker.py}, \texttt{answer\_verifier.py} \\
+Đánh giá chất lượng & \texttt{app/evaluation}, \texttt{scripts} & \texttt{ragas\_runner.py}, \texttt{benchmark.py}, \texttt{run\_local\_eval.py} \\
+Triển khai và CI & \texttt{deploy}, \texttt{.github/workflows} & \texttt{nginx.conf}, \texttt{ci.yml}, \texttt{test.yml} \\
+\bottomrule
+\end{longtable}
+
+\textbf{Luồng làm việc GitHub khuyến nghị}
+\begin{enumerate}[label=\arabic*.]
+    \item Nhánh \texttt{main}: luôn ở trạng thái deploy được.
+    \item Nhánh \texttt{develop} hoặc làm việc trực tiếp bằng feature branches nếu nhóm nhỏ.
+    \item Mỗi tính năng lớn đi theo một nhánh riêng, ví dụ:\newline
+    \texttt{feature/document-upload}, \texttt{feature/hybrid-retrieval}, \texttt{feature/answer-verification}.
+    \item Mỗi pull request cần đi kèm:\newline
+    mô tả thay đổi, ảnh hưởng đến pipeline nào, test nào đã chạy.
+    \item CI tối thiểu phải chạy lint + unit test + integration smoke test.
+\end{enumerate}
+
+\textbf{Output mẫu của bước bổ sung này}
+\begin{lstlisting}
+{
+  "repository_name": "tutorrag",
+  "main_directories": [
+    "app",
+    "docs",
+    "scripts",
+    "tests",
+    "deploy",
+    ".github/workflows"
+  ],
+  "core_modules": [
+    "ingestion",
+    "knowledge",
+    "retrieval",
+    "reasoning",
+    "verification",
+    "evaluation"
+  ],
+  "entrypoints": [
+    "app/main.py",
+    "scripts/ingest_folder.py",
+    "scripts/run_local_eval.py"
+  ]
+}
+\end{lstlisting}
+\end{stepbox}
+
+
+\section{Giai đoạn B -- Xây dựng knowledge base từ tài liệu gốc}
+
+\begin{stepbox}{Bước 4. Upload tài liệu và lưu file gốc}
+\stepgoal{Nhận file từ người dùng và lưu an toàn trước khi bắt đầu parse.}
+\stepinput{File nhị phân do user tải lên + metadata ban đầu như môn học, title, loại tài liệu.}
+\stepprocess{Kiểm tra định dạng file, tạo document\_id, lưu file vào storage, ghi bản ghi document vào DB.}
+\stepoutput{File gốc nằm trong storage và một bản ghi document ở metadata DB.}
+\stepnext{Bước 5 -- Parse nội dung tài liệu.}
+\stepmodules{\texttt{app/api/routes\_documents.py}, \texttt{app/ingestion/storage.py}, \texttt{app/db/repositories.py}}
+
+\textbf{Checklist xử lý}
+\begin{enumerate}[label=\arabic*.]
+    \item Kiểm tra phần mở rộng cho phép: PDF/DOCX/PPTX/TXT/MD.
+    \item Tạo \texttt{document\_id} duy nhất.
+    \item Chuẩn hóa tên file để tránh ký tự lạ.
+    \item Lưu file vào đường dẫn theo user và môn.
+    \item Ghi metadata document, trạng thái ban đầu là \texttt{uploaded}.
+\end{enumerate}
+
+\textbf{Output mẫu}
+\begin{lstlisting}
+{
+  "document_id": "doc_001",
+  "status": "uploaded",
+  "storage_path": "storage/user_001/database/norm_slides.pdf",
+  "subject": "database"
+}
+\end{lstlisting}
+\end{stepbox}
+
+\begin{stepbox}{Bước 5. Parse tài liệu thành văn bản có cấu trúc}
+\stepgoal{Trích nội dung văn bản, tiêu đề, số trang, block, heading, bảng và vùng công thức từ file gốc theo đúng thứ tự ngữ nghĩa.}
+\stepinput{File gốc từ bước 4 và metadata document tương ứng.}
+\stepprocess{Chọn parser theo loại file. Với PDF học thuật, ưu tiên parser có hiểu layout như Docling hoặc pipeline parse có awareness về block/bảng/công thức; chỉ rơi về text parser thuần khi tài liệu đơn giản. Với DOCX/PPTX thì đọc cấu trúc heading, bullet, bảng. Với file scan hoặc ảnh chụp, thêm bước OCR rồi mới ghép lại theo reading order.}
+\stepoutput{Parsed document gồm text thô, blocks theo trang, vùng layout quan trọng và metadata layout cơ bản.}
+\stepnext{Bước 6 -- Normalize nội dung.}
+\stepmodules{\texttt{app/ingestion/parser\_docling.py}, \texttt{app/ingestion/parser\_pdf.py}, \texttt{app/ingestion/parser\_docx.py}, \texttt{app/ingestion/parser\_pptx.py}, \texttt{app/ingestion/parser\_ocr.py}}
+
+\textbf{Bạn nên trích những gì từ parser}
+\begin{itemize}
+    \item Text của từng trang.
+    \item Danh sách block hoặc paragraph.
+    \item Heading nếu nhận diện được.
+    \item Số trang bắt đầu và kết thúc của mỗi block.
+    \item Chỉ báo nếu block là bảng, công thức, bullet list, ví dụ.
+    \item Tọa độ hoặc vùng tham chiếu của block để về sau trace lại nguồn gốc khi verifier cần kiểm tra.
+\end{itemize}
+
+\textbf{Mẫu output parse}
+\begin{lstlisting}
+{
+  "document_id": "doc_001",
+  "pages": [
+    {
+      "page_number": 12,
+      "blocks": [
+        {"type": "heading", "text": "BCNF"},
+        {"type": "paragraph", "text": "A relation schema R ..."}
+      ]
+    }
+  ]
+}
+\end{lstlisting}
+
+\begin{warningbox}
+Nếu parser lấy text sai thứ tự đọc, bước chunking sau đó sẽ hỏng. Vì vậy bước parse không chỉ cần ``lấy được chữ'', mà phải giữ được \textbf{thứ tự ngữ nghĩa} của nội dung.
+\end{warningbox}
+
+\begin{warningbox}
+Với tài liệu Bách Khoa có nhiều công thức toán, sơ đồ và bảng, parse text thuần túy rất dễ làm hỏng ngữ nghĩa. Vì vậy nên lưu song song \textbf{text đã parse}, \textbf{loại block} và \textbf{vị trí block trên trang} để về sau có thể kiểm tra lại câu trả lời hoặc hiển thị vùng nguồn gốc chính xác.
+\end{warningbox}
+\end{stepbox}
+
+\begin{stepbox}{Bước 6. Normalize nội dung và loại nhiễu}
+\stepgoal{Làm sạch nội dung để chunking và embedding không bị nhiễu bởi header/footer, số trang và lỗi định dạng, nhưng vẫn giữ được ký hiệu và cấu trúc học thuật quan trọng.}
+\stepinput{Parsed document từ bước 5.}
+\stepprocess{Xóa header/footer lặp, chuẩn hóa whitespace, gộp các dòng bị ngắt sai, giữ heading và các thực thể học thuật. Với công thức, ký hiệu đặc biệt và tên biến, chỉ normalize nhẹ; không được biến đổi đến mức làm mất nghĩa.}
+\stepoutput{Clean document có cấu trúc rõ ràng, ít nhiễu và vẫn bảo toàn nội dung chuyên ngành.}
+\stepnext{Bước 7 -- Chunking theo cấu trúc.}
+\stepmodules{\texttt{app/ingestion/cleaner.py}, \texttt{app/ingestion/normalizer.py}, \texttt{app/ingestion/symbol\_preserver.py}}
+
+\textbf{Các thao tác normalize nên có}
+\begin{enumerate}[label=\arabic*.]
+    \item Xóa chuỗi lặp ở đầu/trang cuối như tên trường, môn học, page number.
+    \item Chuẩn hóa khoảng trắng, xuống dòng, tab.
+    \item Gộp các đoạn ngắt dòng giữa câu do layout PDF.
+    \item Giữ lại các heading, bullet và định dạng danh sách.
+    \item Đánh dấu vùng là ``definition'', ``example'', ``theorem'', ``exercise'' nếu có thể suy ra từ heading hoặc pattern.
+    \item Bảo toàn ký hiệu toán học, ký hiệu logic, tên biến và chuỗi viết tắt chuyên ngành ở bản text chính hoặc ở một trường song song.
+\end{enumerate}
+
+\textbf{Input và output của bước này cần khác nhau ra sao}
+\begin{itemize}
+    \item \textbf{Input}: text còn lẫn thành phần trình bày.
+    \item \textbf{Output}: text hướng nội dung, ít phụ thuộc layout, nhưng không đánh mất công thức hoặc ký hiệu gốc.
+\end{itemize}
+\end{stepbox}
+
+\begin{stepbox}{Bước 7. Chia chunk theo cấu trúc học thuật}
+\stepgoal{Tạo các chunk đủ ngắn để retrieve tốt nhưng vẫn đủ giàu ngữ cảnh để LLM hiểu đúng.}
+\stepinput{Clean document từ bước 6.}
+\stepprocess{Chia trước theo chapter/section/heading; sau đó nếu đoạn còn quá dài thì cắt tiếp theo token budget với overlap hợp lý.}
+\stepoutput{Danh sách chunks thô có text và ranh giới trang/section.}
+\stepnext{Bước 8 -- Gắn metadata và phân loại chunk.}
+\stepmodules{\texttt{app/ingestion/chunker.py}, \texttt{app/ingestion/tokenizer.py}}
+
+\textbf{Nguyên tắc chunking cho bài toán tự học}
+\begin{itemize}
+    \item Không cắt giữa định nghĩa và ví dụ minh họa nếu hai phần nằm sát nhau.
+    \item Không cắt giữa statement của định lý và phần giải thích ngắn ngay sau nó.
+    \item Ưu tiên 400--700 tokens/chunk với overlap 80--120 tokens.
+    \item Nếu là slide, có thể chunk theo từng slide hoặc theo mỗi nhóm bullet liên quan.
+\end{itemize}
+
+\textbf{Output mẫu}
+\begin{lstlisting}
+[
+  {
+    "chunk_id": "temp_001",
+    "page_start": 12,
+    "page_end": 13,
+    "section": "BCNF",
+    "text": "Boyce-Codd Normal Form ..."
+  }
+]
+\end{lstlisting}
+\end{stepbox}
+
+\begin{stepbox}{Bước 8. Gắn metadata cho từng chunk}
+\stepgoal{Làm cho mỗi chunk trở thành một đơn vị tri thức có thể lọc, truy hồi, giải thích và log được.}
+\stepinput{Chunks thô từ bước 7 + document metadata từ bước 4.}
+\stepprocess{Gắn user\_id, subject, chapter, section, content\_type, keywords, page range, title, source\_type, language cho từng chunk.}
+\stepoutput{Chunk records đầy đủ metadata.}
+\stepnext{Bước 9 -- Sinh embeddings dense.}
+\stepmodules{\texttt{app/ingestion/metadata.py}, \texttt{app/ingestion/enrichers.py}}
+
+\textbf{Các trường metadata rất đáng giá cho retrieval về sau}
+\begin{itemize}
+    \item \texttt{subject}: lọc theo môn học.
+    \item \texttt{chapter}, \texttt{section}: lọc theo chương/mục.
+    \item \texttt{content\_type}: definition, example, theorem, proof, exercise, solution.
+    \item \texttt{difficulty}: easy, medium, hard.
+    \item \texttt{keywords}: từ khóa học thuật quan trọng.
+\end{itemize}
+\end{stepbox}
+
+\begin{stepbox}{Bước 9. Sinh dense embeddings cho chunk}
+\stepgoal{Mã hóa ngữ nghĩa của chunk thành vector để phục vụ semantic retrieval.}
+\stepinput{Chunk records đã hoàn chỉnh từ bước 8.}
+\stepprocess{Đưa text của mỗi chunk qua mô hình embedding, đồng thời giữ liên kết giữa vector và metadata gốc.}
+\stepoutput{Dense vectors cho từng chunk.}
+\stepnext{Bước 10 -- Tạo sparse representation; Bước 13 -- Upsert vào vector DB.}
+\stepmodules{\texttt{app/retrieval/embedder.py}, \texttt{app/retrieval/embedding\_jobs.py}}
+
+\textbf{Điểm cần lưu ý}
+\begin{enumerate}[label=\arabic*.]
+    \item Chỉ embed phần text nội dung chính, không embed metadata rác.
+    \item Nếu dùng batching, phải log chunk nào thất bại để retry.
+    \item Nên cache embedding theo hash của text để tránh tính lại khi reindex.
+\end{enumerate}
+
+\textbf{Output mẫu}
+\begin{lstlisting}
+{
+  "chunk_id": "chunk_0001",
+  "dense_vector": [0.014, -0.082, ...],
+  "embedding_model": "text-embedding-3-small"
+}
+\end{lstlisting}
+\end{stepbox}
+
+\begin{stepbox}{Bước 10. Tạo chỉ mục sparse / lexical representation}
+\stepgoal{Bổ sung khả năng tìm theo từ khóa chính xác, viết tắt, tên thuật toán, ký hiệu học thuật.}
+\stepinput{Chunk records từ bước 8.}
+\stepprocess{Tạo sparse vector hoặc chỉ mục BM25/term-weight cho từng chunk.}
+\stepoutput{Sparse representation hoặc thông tin cần thiết cho lexical search.}
+\stepnext{Bước 13 -- Upsert vào vector DB; Bước 17 -- Hybrid retrieval.}
+\stepmodules{\texttt{app/retrieval/sparse\_index.py}, \texttt{app/retrieval/bm25.py}}
+
+\textbf{Tại sao bước này quan trọng}
+\begin{itemize}
+    \item Người học thường hỏi các từ khóa chính xác như BCNF, DFS, MLE, entropy, backprop.
+    \item Dense retrieval tốt ở ngữ nghĩa nhưng có thể bỏ sót keyword hiếm.
+    \item Sparse retrieval giúp bắt trúng tên khái niệm, công thức, ký hiệu.
+\end{itemize}
+\end{stepbox}
+
+\section{Giai đoạn C -- Làm knowledge base thông minh hơn vector search thuần túy}
+
+\begin{stepbox}{Bước 11. Xây concept index}
+\stepgoal{Biến các đoạn text thành lớp khái niệm có cấu trúc để hỗ trợ reasoning, giải thích, query expansion và làm nền cho GraphRAG ở mức nhẹ.}
+\stepinput{Chunk records từ bước 8.}
+\stepprocess{Trích các khái niệm, định nghĩa, thuật ngữ, công thức, tên thuật toán từ chunk; lưu chúng thành một index riêng. Có thể bắt đầu bằng JSON/SQL đơn giản trước khi nâng cấp thành graph store chuyên dụng.}
+\stepoutput{Danh sách concept records liên kết ngược về chunk nguồn.}
+\stepnext{Bước 12 -- Xây relation graph; Bước 16 -- Query decomposition có thể dùng concept index để mở rộng truy vấn.}
+\stepmodules{\texttt{app/knowledge/concept\_extractor.py}, \texttt{app/knowledge/concept\_index.py}, \texttt{app/knowledge/concept\_store.py}}
+
+\textbf{Ví dụ concept record}
+\begin{lstlisting}
+{
+  "concept_id": "concept_010",
+  "name": "BCNF",
+  "aliases": ["Boyce-Codd Normal Form"],
+  "subject": "database",
+  "definition_chunk_ids": ["chunk_0001"],
+  "related_keywords": ["functional dependency", "normalization"]
+}
+\end{lstlisting}
+
+\textbf{Lợi ích}
+\begin{itemize}
+    \item Hỗ trợ đồng nhất từ đồng nghĩa/viết tắt.
+    \item Giúp query ``chuẩn 3'' vẫn tìm được ``3NF''.
+    \item Làm nền cho sơ đồ prerequisite hoặc quan hệ khái niệm.
+\end{itemize}
+\end{stepbox}
+
+\begin{stepbox}{Bước 12. Xây relation graph giữa khái niệm, ví dụ và prerequisite}
+\stepgoal{Tạo khả năng truy luận có cấu trúc thay vì chỉ dựa vào độ gần vector.}
+\stepinput{Concept index từ bước 11 + chunk records từ bước 8.}
+\stepprocess{Tạo các cạnh như prerequisite, contrast, example-of, theorem-for, used-in-solution, same-topic. Nếu cần hỏi đáp theo prerequisite hoặc learning path, có thể lưu graph này trong Neo4j hoặc một graph store nhỏ; không nên xem metadata filter trong vector DB là graph traversal hoàn chỉnh.}
+\stepoutput{Đồ thị quan hệ tri thức.}
+\stepnext{Bước 16 -- Query decomposition; Bước 18 và 19 -- Evidence building và reasoning synthesis.}
+\stepmodules{\texttt{app/knowledge/relation\_graph.py}, \texttt{app/knowledge/graph\_builders.py}, \texttt{app/knowledge/graph\_store.py}}
+
+\textbf{Ví dụ cạnh trong graph}
+\begin{lstlisting}
+{
+  "from": "concept_BCNF",
+  "to": "concept_3NF",
+  "relation": "stronger_than"
+}
+\end{lstlisting}
+
+\textbf{Lợi ích của relation graph}
+\begin{itemize}
+    \item Câu hỏi so sánh được hỗ trợ tốt hơn.
+    \item Câu hỏi ``tại sao'' có thể kéo thêm khái niệm prerequisite.
+    \item Câu hỏi bài tập có thể tìm ví dụ tương tự nhanh hơn.
+    \item Hỗ trợ trực tiếp các câu như ``Cần học gì trước khi học BCNF?'' hoặc ``Khái niệm nào là nền cho phần này?''.
+\end{itemize}
+\end{stepbox}
+
+\begin{stepbox}{Bước 13. Upsert toàn bộ tri thức vào vector database}
+\stepgoal{Đưa dense vector, sparse vector và metadata vào cùng một collection để phục vụ hybrid retrieval.}
+\stepinput{Dense vectors từ bước 9, sparse representation từ bước 10, metadata từ bước 8.}
+\stepprocess{Tạo collection, định nghĩa payload schema, upsert từng chunk, lưu mapping giữa chunk\_id và vector point.}
+\stepoutput{Knowledge base truy hồi được.}
+\stepnext{Bước 14 -- Xử lý query online.}
+\stepmodules{\texttt{app/retrieval/vector\_store.py}, \texttt{scripts/reindex\_subject.py}}
+
+\textbf{Payload tối thiểu nên lưu}
+\begin{lstlisting}
+{
+  "chunk_id": "chunk_0001",
+  "document_id": "doc_001",
+  "user_id": "user_001",
+  "subject": "database",
+  "chapter": "Normalization",
+  "section": "BCNF",
+  "page_start": 12,
+  "page_end": 13,
+  "content_type": "definition",
+  "title": "Normalization Slides"
+}
+\end{lstlisting}
+
+\textbf{Lưu ý vận hành}
+\begin{itemize}
+    \item Mọi truy hồi online phải luôn filter theo \texttt{user\_id}.
+    \item Nếu user đã chọn môn học, nên filter thêm theo \texttt{subject}.
+    \item Reindex nên chạy được theo document, theo subject hoặc toàn user.
+\end{itemize}
+\end{stepbox}
+
+\section{Giai đoạn D -- Online pipeline cho câu hỏi có suy luận}
+
+\begin{stepbox}{Bước 14. Nhận query online và chuẩn hóa request}
+\stepgoal{Biến câu hỏi thô của user thành một gói truy vấn giàu ngữ cảnh.}
+\stepinput{Câu hỏi user, session history ngắn, subject đang chọn trên UI, chế độ học nếu có.}
+\stepprocess{Chuẩn hóa chuỗi hỏi, lưu session id, xác định subject hiện tại, thu gọn lịch sử chat cần thiết.}
+\stepoutput{QueryRequest chuẩn hóa.}
+\stepnext{Bước 15 -- Query understanding.}
+\stepmodules{\texttt{app/api/routes\_chat.py}, \texttt{app/reasoning/query\_request.py}, \texttt{app/core/session.py}}
+
+\textbf{Ví dụ QueryRequest}
+\begin{lstlisting}
+{
+  "session_id": "sess_001",
+  "user_id": "user_001",
+  "question": "Tai sao trong bai nay chap nhan 3NF thay vi BCNF?",
+  "subject_hint": "database",
+  "study_mode": "explain",
+  "chat_history": ["..."]
+}
+\end{lstlisting}
+\end{stepbox}
+
+\begin{stepbox}{Bước 15. Query understanding và phân loại intent}
+\stepgoal{Xác định loại câu hỏi để chọn chiến lược retrieve và reasoning phù hợp.}
+\stepinput{QueryRequest từ bước 14.}
+\stepprocess{Phân loại câu hỏi thành lookup, explanation, comparison, why-question, problem-solving, contradiction-checking, summary, quiz-generation. Đồng thời suy ra mức độ cần multi-hop reasoning và quyết định có cần planner kiểu agent có giới hạn hay không.}
+\stepoutput{QueryAnalysis gồm query type, intent, filters, priority content types, difficulty level.}
+\stepnext{Bước 16 -- Query decomposition.}
+\stepmodules{\texttt{app/reasoning/query\_classifier.py}, \texttt{app/reasoning/query\_analysis.py}}
+
+\textbf{Ví dụ output}
+\begin{lstlisting}
+{
+  "query_type": "why_reasoning",
+  "requires_multi_hop": true,
+  "subject": "database",
+  "preferred_content_types": ["definition", "example", "solution"],
+  "reasoning_depth": "medium"
+}
+\end{lstlisting}
+\end{stepbox}
+
+\begin{stepbox}{Bước 16. Query decomposition và lập kế hoạch suy luận}
+\stepgoal{Tách câu hỏi lớn thành các câu hỏi con có thể truy hồi và kiểm chứng được.}
+\stepinput{QueryAnalysis từ bước 15, query gốc, concept index và relation graph.}
+\stepprocess{Sinh sub-questions, sub-queries, giả thuyết cần kiểm tra, metadata filters và thứ tự ưu tiên truy hồi. Nếu dùng agentic planning, chỉ nên dùng planner kiểu ReAct có giới hạn: số vòng ít, số tool ít và có điều kiện dừng rõ ràng.}
+\stepoutput{QueryPlan.}
+\stepnext{Bước 17 -- Hybrid retrieval nhiều vòng.}
+\stepmodules{\texttt{app/reasoning/query\_decomposer.py}, \texttt{app/reasoning/planner.py}, \texttt{app/reasoning/react\_planner.py}}
+
+\textbf{Ví dụ QueryPlan}
+\begin{lstlisting}
+{
+  "main_question": "Tai sao chap nhan 3NF thay vi BCNF?",
+  "sub_questions": [
+    "3NF la gi?",
+    "BCNF la gi?",
+    "Trong bai hien tai co trade-off dependency preservation khong?"
+  ],
+  "filters": {
+    "user_id": "user_001",
+    "subject": "database"
+  }
+}
+\end{lstlisting}
+
+\textbf{Nguyên tắc decomposition tốt}
+\begin{itemize}
+    \item Mỗi sub-question phải đủ cụ thể để retrieve được.
+    \item Không tạo quá nhiều sub-question không cần thiết vì sẽ tăng độ trễ.
+    \item Với câu hỏi bài tập, nên có ít nhất một sub-question hỏi về \textbf{dữ kiện đề bài} và một sub-question hỏi về \textbf{nguyên lý liên quan}.
+    \item Nếu dùng planner dạng agent, phải đặt giới hạn số vòng reasoning/retrieval và có tiêu chí dừng như ``đã đủ evidence'' hoặc ``đã chạm ngưỡng lặp tối đa''.
+\end{itemize}
+\end{stepbox}
+
+\begin{stepbox}{Bước 17. Hybrid retrieval nhiều vòng}
+\stepgoal{Lấy đủ bằng chứng từ knowledge base cho từng sub-question, thay vì chỉ retrieve một lần cho câu hỏi gốc.}
+\stepinput{QueryPlan từ bước 16, vector DB từ bước 13, concept index và metadata filters.}
+\stepprocess{Chạy dense retrieval, sparse retrieval và retrieval theo metadata/concept. Có thể lặp lại vòng retrieval nếu reasoning sơ bộ cho thấy evidence còn thiếu, nhưng phải giới hạn số vòng để tránh agent loop vô ích.}
+\stepoutput{Candidate evidence pool.}
+\stepnext{Bước 18 -- Merge, dedupe, rerank.}
+\stepmodules{\texttt{app/retrieval/retriever.py}, \texttt{app/retrieval/hybrid\_retriever.py}, \texttt{app/retrieval/query\_expander.py}}
+
+\textbf{Chi tiết nên làm trong bước này}
+\begin{enumerate}[label=\arabic*.]
+    \item Với mỗi sub-query, tạo embedding query.
+    \item Chạy dense top-k.
+    \item Chạy sparse/BM25 top-k.
+    \item Thêm retrieval theo concept hoặc keyword alias nếu có.
+    \item Hợp nhất kết quả và gắn nguồn sub-query nào đã lấy ra kết quả đó.
+\end{enumerate}
+
+\textbf{Output mẫu}
+\begin{lstlisting}
+[
+  {
+    "chunk_id": "chunk_0001",
+    "retrieved_for": "BCNF la gi?",
+    "dense_score": 0.81,
+    "sparse_score": 0.66
+  },
+  {
+    "chunk_id": "chunk_0045",
+    "retrieved_for": "trade-off dependency preservation",
+    "dense_score": 0.77,
+    "sparse_score": 0.71
+  }
+]
+\end{lstlisting}
+\end{stepbox}
+
+\begin{stepbox}{Bước 18. Merge, deduplicate và rerank thành evidence set}
+\stepgoal{Rút candidate pool thành tập bằng chứng mạnh nhất, ít trùng lặp nhất và phủ đủ các ý cần suy luận.}
+\stepinput{Candidate evidence pool từ bước 17.}
+\stepprocess{Gộp các chunk trùng, tính điểm tổng hợp, dùng reranker chấm relevance theo cặp (question, chunk), rồi chọn top evidence có độ phủ tốt.}
+\stepoutput{Evidence set đã xếp hạng.}
+\stepnext{Bước 19 -- Reasoning synthesis.}
+\stepmodules{\texttt{app/retrieval/reranker.py}, \texttt{app/reasoning/evidence\_builder.py}}
+
+\textbf{Điều bắt buộc ở bước này}
+\begin{itemize}
+    \item Không chỉ lấy ``điểm cao nhất'' mà phải kiểm tra \textbf{độ phủ} giữa các sub-question.
+    \item Hạn chế nhét nhiều chunk lặp ý giống nhau.
+    \item Gắn lý do giữ lại mỗi evidence: định nghĩa, ví dụ, lời giải, phản ví dụ.
+\end{itemize}
+
+\textbf{Ví dụ output}
+\begin{lstlisting}
+{
+  "evidence_items": [
+    {
+      "chunk_id": "chunk_0001",
+      "role": "definition_of_BCNF",
+      "score": 0.93
+    },
+    {
+      "chunk_id": "chunk_0045",
+      "role": "tradeoff_example",
+      "score": 0.91
+    }
+  ]
+}
+\end{lstlisting}
+\end{stepbox}
+
+\begin{stepbox}{Bước 19. Reasoning synthesis trên evidence set}
+\stepgoal{Tạo câu trả lời biết kết nối nhiều bằng chứng nhưng vẫn bám chặt vào chúng.}
+\stepinput{Question gốc, QueryAnalysis, Evidence set đã rerank.}
+\stepprocess{Cho LLM tổng hợp bằng chứng, rút ra các claims chính, viết reasoning summary, tạo draft answer và gắn citations theo từng claim quan trọng.}
+\stepoutput{Draft answer có structure rõ ràng.}
+\stepnext{Bước 20 -- Verification.}
+\stepmodules{\texttt{app/reasoning/synthesizer.py}, \texttt{app/generation/prompts.py}, \texttt{app/generation/answerer.py}}
+
+\textbf{Luật prompt quan trọng}
+\begin{enumerate}[label=\arabic*.]
+    \item Chỉ suy luận từ evidence được đưa vào.
+    \item Mọi kết luận chính phải chỉ ra chunk hỗ trợ.
+    \item Nếu evidence mâu thuẫn, phải nêu điểm mâu thuẫn thay vì ép ra một kết luận giả.
+    \item Nếu evidence chưa đủ, phải trả lời thiếu bằng chứng.
+\end{enumerate}
+
+\textbf{Output mẫu}
+\begin{lstlisting}
+{
+  "direct_answer": "...",
+  "reasoning_summary": [
+    "BCNF la dang manh hon 3NF.",
+    "Tuy nhien decomposition len BCNF co the lam mat dependency preservation.",
+    "Tai lieu dang xet uu tien bao toan phu thuoc ham."
+  ],
+  "citations": ["chunk_0001", "chunk_0045"]
+}
+\end{lstlisting}
+\end{stepbox}
+
+\begin{stepbox}{Bước 20. Verification và claim checking}
+\stepgoal{Ngăn câu trả lời cuối cùng vượt ra ngoài evidence hoặc trích dẫn sai chỗ.}
+\stepinput{Draft answer từ bước 19 và evidence set từ bước 18.}
+\stepprocess{Tách answer thành claims, kiểm tra từng claim có được support bởi evidence hay không, loại bỏ hoặc viết lại claim không được hỗ trợ. Online verifier phải chạy trong runtime; còn các framework như Ragas nên dùng chủ yếu cho evaluation định kỳ và benchmark faithfulness ở bước 23.}
+\stepoutput{Final answer đã kiểm chứng.}
+\stepnext{Bước 21 -- Logging và feedback.}
+\stepmodules{\texttt{app/verification/verifier.py}, \texttt{app/verification/claim\_checker.py}, \texttt{app/evaluation/ragas\_runner.py}}
+
+\textbf{Bộ câu hỏi verifier nên tự hỏi}
+\begin{itemize}
+    \item Claim này có evidence trực tiếp không?
+    \item Citation gắn có thực sự support claim đó không?
+    \item Có đoạn nào answer suy diễn quá xa không?
+    \item Có sub-question nào trong QueryPlan chưa được cover không?
+    \item Nếu chấm theo faithfulness, câu trả lời này có câu nào không bám vào ngữ cảnh đã retrieve hay không?
+\end{itemize}
+
+\textbf{Ví dụ output}
+\begin{lstlisting}
+{
+  "verified": true,
+  "removed_claims": [],
+  "confidence": 0.84,
+  "final_answer": "..."
+}
+\end{lstlisting}
+\end{stepbox}
+
+\begin{stepbox}{Bước 21. Logging, analytics và feedback loop}
+\stepgoal{Biến mỗi phiên hỏi đáp thành dữ liệu để đánh giá và cải thiện hệ thống.}
+\stepinput{Final answer, evidence set, query info, phản hồi user nếu có.}
+\stepprocess{Lưu toàn bộ các trường quan trọng: question, query type, retrieved chunks, rerank scores, final citations, response time, feedback.}
+\stepoutput{Answer log và feedback records.}
+\stepnext{Bước 23 -- Evaluation định kỳ và cải thiện retrieval/reasoning.}
+\stepmodules{\texttt{app/db/logging.py}, \texttt{app/evaluation/log\_reader.py}}
+
+\textbf{Những gì nên log}
+\begin{itemize}
+    \item Question gốc.
+    \item Query type và QueryPlan.
+    \item Top candidates và evidence cuối cùng.
+    \item Prompt version.
+    \item Câu trả lời cuối cùng.
+    \item Feedback thumbs up/down hoặc nhãn ``hữu ích / không hữu ích''.
+\end{itemize}
+\end{stepbox}
+
+\section{Giai đoạn E -- Orchestration, API, đánh giá và triển khai}
+
+\begin{stepbox}{Bước 22. Đóng gói thành API và orchestration layer}
+\stepgoal{Kết nối toàn bộ pipeline thành một backend có thể gọi từ web app hoặc app di động.}
+\stepinput{Tất cả các module từ bước 4 đến bước 21.}
+\stepprocess{Xây các API upload, index, ask, list documents, list subjects, feedback; tạo service layer điều phối thứ tự chạy của từng thành phần.}
+\stepoutput{Một backend có endpoint rõ ràng.}
+\stepnext{Bước 23 -- Evaluation; Bước 24 -- Deployment.}
+\stepmodules{\texttt{app/api/main.py}, \texttt{app/services/*.py}, \texttt{app/api/routes\_*.py}}
+
+\textbf{Các endpoint tối thiểu}
+\begin{lstlisting}
+POST /documents/upload
+POST /documents/{document_id}/index
+GET  /subjects
+GET  /subjects/{subject}/documents
+POST /chat/ask
+POST /chat/feedback
+GET  /health
+\end{lstlisting}
+
+\textbf{Dòng chảy của endpoint /chat/ask}
+\begin{enumerate}[label=\arabic*.]
+    \item Nhận question.
+    \item Tạo QueryRequest.
+    \item Query understanding.
+    \item Query decomposition.
+    \item Hybrid retrieval.
+    \item Rerank và build evidence set.
+    \item Reasoning synthesis.
+    \item Verification.
+    \item Trả final answer + citations.
+\end{enumerate}
+\end{stepbox}
+
+\begin{stepbox}{Bước 23. Xây bộ evaluation để đo retrieval và reasoning}
+\stepgoal{Đánh giá hệ thống một cách có hệ thống thay vì chỉ ``thấy có vẻ đúng''.}
+\stepinput{Knowledge base đã xây, logs từ bước 21, một tập câu hỏi chuẩn do bạn soạn.}
+\stepprocess{Xây benchmark dataset, chấm hit-rate, context precision/recall, faithfulness, answer relevancy, latency, cost.}
+\stepoutput{Báo cáo chất lượng theo phiên bản hệ thống.}
+\stepnext{Quay lại các bước 7, 10, 17, 18, 19 để tối ưu.}
+\stepmodules{\texttt{app/evaluation/dataset\_builder.py}, \texttt{app/evaluation/metrics.py}, \texttt{scripts/eval\_rag.py}}
+
+\textbf{Cách xây bộ test}
+\begin{itemize}
+    \item 20 câu định nghĩa.
+    \item 20 câu so sánh.
+    \item 20 câu why/how cần suy luận đa bước.
+    \item 20 câu bài tập hoặc tình huống áp dụng.
+    \item 20 câu dễ gây nhầm lẫn giữa hai khái niệm gần nhau.
+\end{itemize}
+
+\textbf{Các metric nên có}
+\begin{itemize}
+    \item Retrieval hit rate@k.
+    \item Context precision.
+    \item Context recall.
+    \item Faithfulness.
+    \item Answer relevancy.
+    \item Latency trung bình.
+\end{itemize}
+\end{stepbox}
+
+\begin{stepbox}{Bước 24. Triển khai local, staging và production}
+\stepgoal{Đưa hệ thống từ môi trường phát triển sang môi trường chạy ổn định.}
+\stepinput{Backend hoàn chỉnh từ bước 22 và cấu hình vận hành.}
+\stepprocess{Dockerize services, quản lý biến môi trường, mount storage, backup DB, monitoring logs, thiết lập CI/CD cơ bản.}
+\stepoutput{Môi trường triển khai chạy được và có thể mở rộng.}
+\stepnext{Vòng lặp cải tiến tiếp theo dựa trên feedback thực tế.}
+\stepmodules{\texttt{Dockerfile}, \texttt{docker-compose.yml}, \texttt{.env}, \texttt{deploy/}}
+
+\textbf{Môi trường nên có}
+\begin{itemize}
+    \item \textbf{Local}: để phát triển và debug nhanh.
+    \item \textbf{Staging}: để test với dữ liệu gần giống production.
+    \item \textbf{Production}: có logging, backup, monitoring.
+\end{itemize}
+\end{stepbox}
+
+\section{Mối liên hệ input-output giữa các bước}
+
+\begin{overviewbox}
+\textbf{Quy tắc dây chuyền}\newline
+Mỗi bước chỉ nên nhận \textbf{một input contract rõ ràng} và trả \textbf{một output contract rõ ràng}. Tránh thiết kế module ``làm tất cả'' vì rất khó debug khi chất lượng retrieval kém hay reasoning sai.
+\end{overviewbox}
+
+\subsection{Chuỗi offline}
+\begin{lstlisting}
+Raw file
+-> ParsedDocument
+-> CleanDocument
+-> ChunkList
+-> EnrichedChunkList
+-> DenseVectors + SparseVectors
+-> ConceptIndex + RelationGraph
+-> VectorDB Collection
+\end{lstlisting}
+
+\subsection{Chuỗi online}
+\begin{lstlisting}
+UserQuestion
+-> QueryRequest
+-> QueryAnalysis
+-> QueryPlan
+-> CandidateEvidencePool
+-> EvidenceSet
+-> DraftAnswer
+-> VerifiedAnswer
+-> AnswerLog
+\end{lstlisting}
+
+\section{Kế hoạch triển khai đề xuất theo tuần}
+
+\begin{longtable}{p{0.12\textwidth}p{0.82\textwidth}}
+\toprule
+\textbf{Tuần} & \textbf{Việc nên hoàn thành} \\
+\midrule
+\endhead
+Tuần 1 & Bước 1, 2, 3. Chốt use case, schema, project skeleton. \\
+Tuần 2 & Bước 4, 5, 6. Hoàn thành upload, parse, normalize. \\
+Tuần 3 & Bước 7, 8, 9, 10. Hoàn thành chunking và indexing dense/sparse. \\
+Tuần 4 & Bước 11, 12, 13. Thêm concept index, relation graph và upsert vector DB. \\
+Tuần 5 & Bước 14, 15, 16. Hoàn thành query understanding và decomposition. \\
+Tuần 6 & Bước 17, 18. Hoàn thành hybrid retrieval, reranker, evidence set. \\
+Tuần 7 & Bước 19, 20. Hoàn thành reasoning synthesis và verification. \\
+Tuần 8 & Bước 21, 22, 23, 24. Logging, evaluation, deployment, demo. \\
+\bottomrule
+\end{longtable}
+
+\section{Definition of Done cho từng lớp hệ thống}
+
+\subsection{Offline ingestion hoàn thành khi nào?}
+\begin{itemize}
+    \item Upload được ít nhất 3 loại tài liệu khác nhau.
+    \item Parse giữ đúng phần lớn thứ tự ngữ nghĩa.
+    \item Chunk có metadata đầy đủ, truy xuất được trang nguồn.
+    \item Reindex một tài liệu không làm hỏng các tài liệu khác.
+\end{itemize}
+
+\subsection{Retrieval hoàn thành khi nào?}
+\begin{itemize}
+    \item Câu hỏi định nghĩa đơn giản retrieve đúng trong top-k phần lớn thời gian.
+    \item Câu hỏi keyword hiếm vẫn retrieve được nhờ sparse search.
+    \item Có thể lọc theo user và subject chính xác.
+\end{itemize}
+
+\subsection{Reasoning pipeline hoàn thành khi nào?}
+\begin{itemize}
+    \item Câu hỏi so sánh và why-question có thể trả lời bằng nhiều evidence.
+    \item Khi evidence thiếu, hệ thống biết từ chối kết luận chắc chắn.
+    \item Verification loại được claim không có support.
+\end{itemize}
+
+\section{Những lỗi kiến trúc thường gặp cần tránh}
+
+\begin{warningbox}
+\begin{enumerate}[label=\arabic*.]
+    \item Chỉ dùng dense retrieval và bỏ qua sparse search.
+    \item Chunk quá to khiến retrieve trúng mà vẫn không đọc nổi đúng ý.
+    \item Không lưu số trang nên không thể trích nguồn đúng.
+    \item Không phân loại query type nên mọi câu hỏi bị xử lý một kiểu.
+    \item Không có verifier nên answer dễ ``nói thêm'' ngoài evidence.
+    \item Không log retrieved chunks nên không biết retrieval sai hay reasoning sai.
+    \item Không có bộ evaluation nên tối ưu theo cảm giác.
+\end{enumerate}
+\end{warningbox}
+
+
+\section{Điều chỉnh kỹ thuật mở rộng theo góp ý triển khai}
+
+Phần này tổng hợp các góp ý kỹ thuật quan trọng cho đồ án và chuyển chúng thành các quyết định thiết kế \textbf{khả thi hơn với sinh viên AI năm 3}. Mục tiêu không phải là thêm thật nhiều công nghệ, mà là biết \textbf{khi nào nên dùng}, \textbf{dùng ở mức nào} và \textbf{xếp chúng vào giai đoạn nào của roadmap}.
+
+\subsection{Điều chỉnh cho Bước 5 và Bước 6 -- Parsing và Normalize}
+
+\begin{itemize}
+    \item Không nên xem parsing PDF học thuật là bài toán ``rút text'' đơn thuần. Với tài liệu nhiều bảng, sơ đồ và công thức, parser cần giữ được reading order và loại block.
+    \item Với bản đầu, nên ưu tiên parser có awareness về layout như \textbf{Docling} hoặc pipeline tương đương. Đây là lựa chọn thực dụng hơn so với việc đưa thẳng một mô hình Document AI nặng vào hệ thống.
+    \item \textbf{LayoutLM} hoặc các mô hình vision-language cho document understanding là hướng rất hay nếu bạn muốn nghiên cứu sâu, nhưng thường phù hợp hơn với nhánh nghiên cứu Document AI hơn là một thành phần parse ``cắm vào là chạy'' cho đồ án MVP.
+    \item Với tài liệu scan, OCR là bắt buộc; tuy nhiên OCR chỉ là một phần của bài toán, vì sau OCR bạn vẫn phải phục hồi lại thứ tự ngữ nghĩa của block.
+    \item Normalizer phải theo nguyên tắc: \textbf{normalize nhẹ để retrieval tốt hơn, nhưng không được làm mất ký hiệu toán học, ký hiệu logic, tên biến, viết tắt và cấu trúc công thức}. Nếu cần, hãy giữ song song text gốc và text đã normalize.
+\end{itemize}
+
+\textbf{Kết luận kỹ thuật cho đồ án}
+\begin{enumerate}[label=\arabic*.]
+    \item MVP: Docling hoặc parser hiểu layout + normalizer bảo toàn ký hiệu.
+    \item Nâng cấp: thêm OCR pipeline và parser chuyên sâu cho vùng công thức.
+    \item Nghiên cứu mở rộng: thử nghiệm LayoutLM hoặc mô hình vision-language cho parsing phức tạp.
+\end{enumerate}
+
+\subsection{Điều chỉnh cho Bước 11 và Bước 12 -- Concept index, relation graph và hướng GraphRAG}
+
+\begin{itemize}
+    \item Góp ý xây ``bản đồ kiến trúc môn học'' là rất đúng hướng. Các câu hỏi kiểu prerequisite, lộ trình học, quan hệ giữa hai khái niệm gần nhau thường cần một lớp graph hoặc relation map.
+    \item Tuy nhiên, cần phân biệt rõ: \textbf{Vector DB giải quyết retrieval}; còn \textbf{graph layer giải quyết quan hệ}. Metadata filter hoặc payload link trong vector DB không thay thế hoàn toàn graph traversal.
+    \item Vì vậy, hướng khả thi là đi theo ba nấc:
+    \begin{enumerate}[label=\alph*.]
+        \item v1: chỉ dùng Qdrant + metadata tốt.
+        \item v2: thêm concept index và relation graph lưu dưới dạng JSON/SQL hoặc graph nhẹ.
+        \item v3: nếu cần nhiều câu hỏi prerequisite/path reasoning, thêm Neo4j hoặc graph store riêng.
+    \end{enumerate}
+    \item Đây chính là hướng GraphRAG ở mức thực dụng: không cần xây full graph ngay từ đầu, mà chỉ thêm lớp quan hệ đủ dùng cho câu hỏi học tập.
+\end{itemize}
+
+\textbf{Kết luận kỹ thuật cho đồ án}
+\begin{enumerate}[label=\arabic*.]
+    \item Đừng bỏ qua concept index và relation graph.
+    \item Đừng nhầm metadata của vector DB với graph hoàn chỉnh.
+    \item Chỉ thêm Neo4j khi bạn thật sự cần traversal hoặc prerequisite reasoning rõ rệt.
+\end{enumerate}
+
+\subsection{Điều chỉnh cho Bước 15, Bước 16 và Bước 17 -- Agentic AI và ReAct planner}
+
+\begin{itemize}
+    \item Ý tưởng dùng Query Decomposer như một agent là đúng, đặc biệt với câu hỏi đa bước.
+    \item Nhưng với đồ án sinh viên, không nên bắt đầu bằng full agent tự do. Cách đó dễ tăng độ trễ, khó debug và khó đánh giá nguyên nhân lỗi.
+    \item Hướng phù hợp hơn là \textbf{bounded agent} hoặc \textbf{planner kiểu ReAct có giới hạn}: chỉ có ít tool, ít vòng lặp và điều kiện dừng rõ ràng.
+    \item Nên coi agent như \textbf{planner/controller} quyết định có cần thêm một vòng retrieval hay không, chứ không phải một thành phần được phép chạy vô hạn.
+\end{itemize}
+
+\textbf{Quy tắc nên áp dụng nếu có agent}
+\begin{enumerate}[label=\arabic*.]
+    \item Giới hạn số vòng reasoning-retrieval.
+    \item Giới hạn số sub-query sinh ra.
+    \item Có tiêu chí dừng như ``đã đủ evidence'' hoặc ``không cải thiện coverage''.
+    \item Mọi kết quả vẫn phải đi qua bước rerank và verification như pipeline chuẩn.
+\end{enumerate}
+
+\subsection{Điều chỉnh cho Bước 20 và Bước 23 -- Verification, Self-RAG và Ragas}
+
+\begin{itemize}
+    \item Nhận xét rằng verification là bước khó nhất là hoàn toàn chính xác. Đây là nơi quyết định hệ thống có thật sự grounded hay không.
+    \item Trong bản đầu, bạn nên tách rõ hai tầng:
+    \begin{enumerate}[label=\alph*.]
+        \item \textbf{Online verification}: chạy ngay trong runtime để kiểm tra claim, support, citation.
+        \item \textbf{Offline evaluation}: dùng Ragas hoặc công cụ tương tự để đo Faithfulness, Context Precision/Recall và Answer Relevancy theo từng phiên bản hệ thống.
+    \end{enumerate}
+    \item \textbf{Self-RAG} là một định hướng rất tốt để nghiên cứu nâng cao, vì nó kết hợp adaptive retrieval và self-reflection. Tuy nhiên, đây nên là hướng nâng cấp sau MVP, không nên coi là yêu cầu bắt buộc của bản đầu.
+\end{itemize}
+
+\textbf{Kết luận kỹ thuật cho đồ án}
+\begin{enumerate}[label=\arabic*.]
+    \item v1: verifier đơn giản nhưng chặt, kiểm tra support và citation.
+    \item v2: bổ sung self-reflection prompt hoặc critique pass.
+    \item v3: thử nghiệm chiến lược gần Self-RAG nếu nhóm còn thời gian và muốn đẩy sâu phần nghiên cứu.
+\end{enumerate}
+
+\subsection{Các thách thức đặc thù với dữ liệu Bách Khoa và tiếng Việt}
+
+\begin{itemize}
+    \item \textbf{Tiếng Việt}: mô hình embedding phải được benchmark thực tế trên corpus tài liệu của nhóm, không nên chọn chỉ vì thấy phổ biến. Dữ liệu học thuật tiếng Việt khác nhiều so với dữ liệu hội thoại hoặc tin tức.
+    \item \textbf{Tài liệu chuyên ngành}: tài liệu kỹ thuật thường chứa rất nhiều ký hiệu đặc biệt, viết tắt, tên biến, công thức và sơ đồ. Nếu clean quá mạnh, retrieval sẽ giảm hit rate và verifier cũng khó đối chiếu lại claim với nguồn.
+    \item \textbf{Tài liệu nhiều loại}: note, slide, handout, đề thi, lời giải và ảnh chụp màn hình có hình thức rất khác nhau. Vì vậy parser và chunker phải xét \texttt{source\_type} ngay từ đầu.
+\end{itemize}
+
+\textbf{Khuyến nghị chốt cho nhóm triển khai}
+\begin{enumerate}[label=\arabic*.]
+    \item Chạy được bản đơn giản trước: layout-aware parsing + chunk tốt + hybrid retrieval + verification.
+    \item Sau đó mới nâng dần: concept graph, bounded ReAct planner, verifier nâng cao.
+    \item Chỉ thêm GraphRAG sâu, agent mạnh hoặc Self-RAG khi đã có benchmark đủ tốt và đã kiểm soát được bản nền.
+\end{enumerate}
+
+\section{Phụ lục A -- Data contracts khuyến nghị}
+
+\subsection{QueryAnalysis}
+\begin{lstlisting}
+{
+  "query_type": "comparison",
+  "requires_multi_hop": true,
+  "subject": "machine_learning",
+  "preferred_content_types": ["definition", "example"],
+  "difficulty": "medium"
+}
+\end{lstlisting}
+
+\subsection{EvidenceItem}
+\begin{lstlisting}
+{
+  "chunk_id": "chunk_0020",
+  "document_id": "doc_010",
+  "role": "comparison_evidence",
+  "score": 0.92,
+  "page_start": 5,
+  "page_end": 5,
+  "text": "..."
+}
+\end{lstlisting}
+
+\subsection{FinalAnswer}
+\begin{lstlisting}
+{
+  "answer": "...",
+  "reasoning_summary": ["...", "..."],
+  "citations": [
+    {
+      "document_id": "doc_010",
+      "chunk_id": "chunk_0020",
+      "page_start": 5,
+      "page_end": 5
+    }
+  ],
+  "confidence": 0.83
+}
+\end{lstlisting}
+
+\section{Phụ lục B -- Skeleton codebase nên có}
+
+\begin{lstlisting}
+app/
+  api/
+    main.py
+    routes_documents.py
+    routes_chat.py
+  core/
+    config.py
+    logging.py
+  db/
+    models.py
+    repositories.py
+  ingestion/
+    storage.py
+    parser_pdf.py
+    cleaner.py
+    chunker.py
+    metadata.py
+  retrieval/
+    embedder.py
+    sparse_index.py
+    vector_store.py
+    hybrid_retriever.py
+    reranker.py
+  knowledge/
+    concept_extractor.py
+    concept_index.py
+    relation_graph.py
+  reasoning/
+    query_classifier.py
+    query_decomposer.py
+    planner.py
+    evidence_builder.py
+    synthesizer.py
+  verification/
+    verifier.py
+    claim_checker.py
+  evaluation/
+    dataset_builder.py
+    metrics.py
+scripts/
+  ingest_folder.py
+  reindex_subject.py
+  eval_rag.py
+\end{lstlisting}
+
+\section{Kết luận}
+
+Nếu làm đúng theo tài liệu này, bạn sẽ đi theo một lộ trình rất rõ ràng:
+\begin{enumerate}[label=\arabic*.]
+    \item Chuẩn hóa bài toán và data contract.
+    \item Xây knowledge base từ tài liệu học tập.
+    \item Tạo hybrid retrieval mạnh ở cả ngữ nghĩa và keyword.
+    \item Thêm lớp concept graph để hỗ trợ reasoning.
+    \item Dùng query decomposition, evidence set, reasoning synthesis và verification\newline để trả lời các câu hỏi kiểu \textit{why/how/comparison/problem-solving}.
+    \item Theo dõi chất lượng bằng evaluation và feedback loop.
+\end{enumerate}
+
+Nói cách khác, bạn không chỉ xây một hệ thống ``hỏi tài liệu'', mà xây một \textbf{trợ lý tự học có suy luận dựa trên bằng chứng}. Đây mới là hướng phù hợp cho topic của bạn.
+
+\end{document}

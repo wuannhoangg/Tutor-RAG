@@ -1,0 +1,131 @@
+# Cline Rules for TutorRAG
+
+## 1. Authority Order
+When multiple project documents overlap or conflict, follow this order:
+
+1. `README.md` is the primary source of truth for:
+   - architecture
+   - naming
+   - target repository structure
+   - MVP scope
+   - implementation order
+2. `plan/rag.tex` is the secondary planning reference.
+3. Existing code and folders outside `plan/` are prior task outputs and should be preserved unless they clearly conflict with `README.md`.
+
+## 2. Project Identity
+This repository is a **grounded reasoning RAG backend for self-learning from personal study materials**.
+
+The system must answer based on retrieved evidence, not free-form guessing.
+
+## 3. Core Design Principles
+1. **Evidence First**  
+   Every major claim must be traceable to retrieved chunks or sources.
+
+2. **No Unsupported Claims**  
+   If evidence is insufficient, explicitly say the material is insufficient instead of inventing information.
+
+3. **Source Citation Required**  
+   Final answers must support citation-oriented output using document/chunk/page metadata.
+
+4. **Grounded First, Reasoning Second**  
+   Reasoning is allowed only on top of retrieved evidence.
+
+## 4. Architecture Rules
+1. The system is split into two non-overlapping domains:
+   - **Offline ingestion/indexing**
+   - **Online query/reasoning**
+
+2. Do not mix ingestion logic with chat/query orchestration.
+
+3. Keep clear contracts between modules. Use typed schemas/Pydantic models for data passing.
+
+4. The API layer (`app/api`) must stay thin. Business logic belongs in services and pipeline modules.
+
+## 5. MVP Scope and Guardrails
+For MVP, prioritize only the following:
+
+- upload and file storage
+- document parsing
+- controlled normalization
+- structure-aware chunking
+- metadata-rich chunks
+- dense + sparse retrieval
+- hybrid retrieval
+- reranking
+- answer synthesis with citations
+- verification / claim support checking
+- logging
+- basic evaluation
+
+Do **not** over-engineer the MVP with:
+- full GraphRAG
+- Neo4j
+- unbounded autonomous agents
+- open-ended multi-loop planning
+- unnecessary production-scale abstractions too early
+
+If planning is needed, use a **bounded planner** with explicit stopping conditions.
+
+## 6. Repository Conventions
+Follow these repository conventions unless `README.md` explicitly says otherwise:
+
+- Use `app/main.py` as the FastAPI entrypoint.
+- Put routes under `app/api/`.
+- Keep retrieval modules clearly named:
+  - `dense_retriever.py`
+  - `sparse_retriever.py`
+  - `hybrid_retriever.py`
+  - `reranker.py`
+- Use `answer_verifier.py` as the verification coordinator.
+- Prefer `pyproject.toml` as the primary dependency source.
+- Local development target:
+  - SQLite for metadata DB
+  - local file storage
+  - Qdrant for vector store
+
+## 7. Execution Workflow
+For every non-trivial task:
+
+1. Inspect the current repository state first.
+2. Compare current state against `README.md` target structure and current phase.
+3. Identify what already exists and what is missing.
+4. Implement only the next dependency-correct step.
+5. After coding:
+   - run relevant checks/tests if possible
+   - fix obvious failures
+   - summarize what changed
+   - state what remains
+
+Do not blindly rewrite stable files unless necessary for correctness or dependency alignment.
+
+## 8. Phase-Based Delivery
+Work in bounded phases, not giant uncontrolled rewrites.
+
+General phase order:
+1. Foundation
+2. Ingestion MVP
+3. Retrieval MVP
+4. Reasoning + Verification
+5. Evaluation + Demo
+
+Unless explicitly instructed otherwise, complete the current phase before moving to the next.
+
+## 9. Coding Standards
+- Write modular, testable code.
+- Keep code comments in English.
+- Prefer safe placeholders over fake implementations.
+- Add minimal meaningful tests when implementing a new layer.
+- Update docs when architecture or run instructions materially change.
+
+## 10. Final Goal
+The MVP should become a runnable local backend that can:
+
+- start a FastAPI app
+- upload and store a document
+- parse, normalize, and chunk it
+- build metadata and indexes
+- perform hybrid retrieval with reranking
+- synthesize cited answers
+- verify claim support
+- expose the flow via API
+- support basic evaluation/debugging
