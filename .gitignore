@@ -75,7 +75,6 @@ logs/
 # =========================
 local_storage/
 uploads/
-storage/
 
 # =========================
 # Runtime / temp
