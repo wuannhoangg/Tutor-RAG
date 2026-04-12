@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     LOG_DIR: str = "./logs"
 
     # Async driver is required by create_async_engine.
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:YOUR_PASSWORD@YOUR_SUPABASE_HOST:6543/postgres"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:YOUR_PASSWORD@YOUR_SUPABASE_HOST:5432/postgres"
 
     VECTOR_STORE_HOST: Optional[str] = "localhost"
     VECTOR_STORE_PORT: int = 6333
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
 
     AUTO_CREATE_TABLES: bool = False
 
-    BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,https://tutor-rag-frontend.onrender.com"
 
     model_config = SettingsConfigDict(
         env_file=".env",
