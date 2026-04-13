@@ -98,7 +98,7 @@ class RetrievalService:
         if not normalized_chunks:
             return 0
 
-        sem = asyncio.Semaphore(3)
+        sem = asyncio.Semaphore(2)  # Giới hạn concurrency để tránh quá tải LLM
 
         async def _safe_extract(txt: str) -> List[str]:
             async with sem:

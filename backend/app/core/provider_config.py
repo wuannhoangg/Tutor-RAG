@@ -125,3 +125,16 @@ def resolve_llm_config(request_config: Optional[LLMConfig]) -> ResolvedLLMConfig
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"Unsupported llm mode: {request_config.mode}",
     )
+
+def resolve_ingestion_llm_config() -> ResolvedLLMConfig:
+    """Hàm phân giải config dành riêng cho quá trình trích xuất lúc up file."""
+    settings = get_settings()
+    provider = _normalize_provider_name(settings.PLATFORM_LLM_PROVIDER)
+    model = _normalize_model_identifier(provider, settings.INGESTION_LLM_MODEL)
+
+    return ResolvedLLMConfig(
+        provider=provider,
+        api_key=_clean_optional(settings.PLATFORM_LLM_API_KEY),
+        base_url=_clean_optional(settings.PLATFORM_LLM_BASE_URL),
+        model=model,
+    )

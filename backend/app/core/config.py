@@ -34,9 +34,11 @@ class Settings(BaseSettings):
     PLATFORM_LLM_BASE_URL: Optional[str] = None
     PLATFORM_LLM_MODEL: str = "gemma-4-31b-it"
 
+    INGESTION_LLM_MODEL: str = "gemma-4-26b-a4b-it"
+
     AUTO_CREATE_TABLES: bool = False
 
-    BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,https://tutor-rag-frontend.onrender.com"
+    BACKEND_CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,https://tutor-rag-frontend.onrender.com,https://wuannlab.id.vn"
 
     model_config = SettingsConfigDict(
         env_file=".env",

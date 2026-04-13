@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from app.core.llm_client import LLMClient
 from app.prompts.graph_prompts import build_concept_extractor_prompt
-from app.core.provider_config import resolve_llm_config
+from app.core.provider_config import resolve_llm_config, resolve_ingestion_llm_config
 from app.schemas.llm_config import LLMConfig
 
 def _clean_concept(concept: str) -> str:
@@ -46,7 +46,10 @@ async def extract_concepts_async(
     if not text.strip():
         return []
 
-    resolved = resolve_llm_config(user_llm_config)
+    if user_llm_config is None or user_llm_config.mode == "platform_default":
+        resolved = resolve_ingestion_llm_config()
+    else:
+        resolved = resolve_llm_config(user_llm_config)
     client = LLMClient(resolved)
     
     prompt = build_concept_extractor_prompt(text=text)
