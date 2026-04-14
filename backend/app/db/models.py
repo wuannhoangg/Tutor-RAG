@@ -10,7 +10,6 @@ JSONType = JSON().with_variant(JSONB, "postgresql")
 
 
 class User(Base):
-    """Represents a system or human user authenticated via Supabase."""
     __tablename__ = "users"
 
     id = Column(String(128), primary_key=True, index=True)
@@ -21,12 +20,27 @@ class User(Base):
         return f"User(id={self.id!r}, email={self.email!r})"
 
 
+class Folder(Base):
+    __tablename__ = "folders"
+
+    folder_id = Column(String(128), primary_key=True, index=True)
+    user_id = Column(String(128), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    is_system = Column(String(5), nullable=False, default="false")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    documents = relationship("Document", back_populates="folder", passive_deletes=True)
+
+    def __repr__(self) -> str:
+        return f"Folder(folder_id={self.folder_id!r}, name={self.name!r})"
+
+
 class Document(Base):
-    """Metadata for an uploaded document."""
     __tablename__ = "documents"
 
     document_id = Column(String(128), primary_key=True, index=True)
     user_id = Column(String(128), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    folder_id = Column(String(128), ForeignKey("folders.folder_id", ondelete="SET NULL"), index=True, nullable=True)
     subject = Column(String(255), index=True, nullable=True)
     title = Column(String(500), nullable=True)
     source_type = Column(String(50), nullable=True)
@@ -39,28 +53,18 @@ class Document(Base):
     tags = Column(JSONType, nullable=True)
     uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    chunks = relationship(
-        "Chunk",
-        back_populates="document",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-    )
+    folder = relationship("Folder", back_populates="documents")
+    chunks = relationship("Chunk", back_populates="document", cascade="all, delete-orphan", passive_deletes=True)
 
     def __repr__(self) -> str:
         return f"Document(document_id={self.document_id!r}, title={self.title!r})"
 
 
 class Chunk(Base):
-    """Represents a semantically chunked piece of text from a document."""
     __tablename__ = "chunks"
 
     chunk_id = Column(String(128), primary_key=True, index=True)
-    document_id = Column(
-        String(128),
-        ForeignKey("documents.document_id", ondelete="CASCADE"),
-        index=True,
-        nullable=False,
-    )
+    document_id = Column(String(128), ForeignKey("documents.document_id", ondelete="CASCADE"), index=True, nullable=False)
     user_id = Column(String(128), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     subject = Column(String(255), index=True, nullable=True)
     chapter = Column(String(255), nullable=True)
@@ -79,7 +83,6 @@ class Chunk(Base):
 
 
 class Answer(Base):
-    """Stores the final synthesized answer and optional evidence linkage."""
     __tablename__ = "answers"
 
     answer_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -90,50 +93,33 @@ class Answer(Base):
     confidence = Column(Float, nullable=True)
     extra_metadata = Column(JSONType, nullable=True)
 
-    citations = relationship(
-        "Citation",
-        back_populates="answer",
-        cascade="all, delete-orphan",
-        passive_deletes=True,
-    )
+    citations = relationship("Citation", back_populates="answer", cascade="all, delete-orphan", passive_deletes=True)
 
     def __repr__(self) -> str:
         return f"Answer(answer_id={self.answer_id!r}, query_id={self.query_id!r})"
 
 
 class Citation(Base):
-    """Links an answer to supporting evidence chunks."""
     __tablename__ = "citations"
 
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    answer_id = Column(
-        Integer,
-        ForeignKey("answers.answer_id", ondelete="CASCADE"),
-        index=True,
-        nullable=False,
-    )
-    document_id = Column(String(128), ForeignKey("documents.document_id", ondelete="CASCADE"), index=True, nullable=True)
-    chunk_id = Column(String(128), ForeignKey("chunks.chunk_id", ondelete="CASCADE"), index=True, nullable=True)
+    citation_id = Column(Integer, primary_key=True, autoincrement=True)
+    answer_id = Column(Integer, ForeignKey("answers.answer_id", ondelete="CASCADE"), index=True, nullable=False)
+    document_id = Column(String(128), ForeignKey("documents.document_id", ondelete="SET NULL"), index=True, nullable=True)
+    chunk_id = Column(String(128), ForeignKey("chunks.chunk_id", ondelete="SET NULL"), index=True, nullable=True)
     page_start = Column(Integer, nullable=True)
     page_end = Column(Integer, nullable=True)
-    snippet = Column(Text, nullable=True)
     extra_metadata = Column(JSONType, nullable=True)
 
     answer = relationship("Answer", back_populates="citations")
 
-    def __repr__(self) -> str:
-        return f"Citation(id={self.id!r}, answer_id={self.answer_id!r})"
-
 
 class Feedback(Base):
-    """Stores user feedback on an answer or query."""
     __tablename__ = "feedback"
 
     feedback_id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(String(128), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    answer_id = Column(Integer, ForeignKey("answers.answer_id", ondelete="SET NULL"), index=True, nullable=True)
     query_id = Column(String(128), index=True, nullable=True)
-    feedback_text = Column(Text, nullable=False)
-    submitted_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-
-    def __repr__(self) -> str:
-        return f"Feedback(feedback_id={self.feedback_id!r}, query_id={self.query_id!r})"
+    rating = Column(Integer, nullable=True)
+    comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

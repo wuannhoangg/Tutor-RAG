@@ -12,8 +12,11 @@ class FeedbackCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True, extra="allow")
 
     user_id: str = Field(default="system_user", description="User providing feedback.")
+    answer_id: Optional[int] = Field(default=None, description="Related answer ID if available.")
     query_id: Optional[str] = Field(default=None, description="Related query ID if available.")
-    feedback_text: str = Field(description="Feedback text content.")
+    rating: Optional[int] = Field(default=None, description="Optional numeric rating.")
+    feedback_text: Optional[str] = Field(default=None, description="Feedback text content.")
+    comment: Optional[str] = Field(default=None, description="Alternative feedback text field.")
 
 
 class FeedbackRead(BaseModel):
@@ -23,6 +26,8 @@ class FeedbackRead(BaseModel):
 
     feedback_id: int
     user_id: Optional[str] = None
+    answer_id: Optional[int] = None
     query_id: Optional[str] = None
-    feedback_text: str
-    submitted_at: Optional[datetime] = None
+    rating: Optional[int] = None
+    comment: Optional[str] = None
+    created_at: Optional[datetime] = None

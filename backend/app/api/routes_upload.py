@@ -19,6 +19,7 @@ async def upload_and_ingest_file(
     file: UploadFile = File(..., description="The document file to upload (PDF, DOCX, PPTX)."),
     subject: Optional[str] = Form(None, description="Subject domain of the document."),
     language: str = Form("vi", description="Primary language of the document."),
+    folder_id: Optional[str] = Form(None, description="Target folder ID."),
     db: AsyncSession = Depends(get_async_session),
     ingestion_service: IngestionService = Depends(get_ingestion_service),
     current_user: AuthenticatedUser = Depends(get_current_user),
@@ -34,10 +35,11 @@ async def upload_and_ingest_file(
     try:
         file_bytes = await file.read()
         logger.info(
-            "Received upload request for file=%s (size=%d bytes), user_id=%s",
+            "Received upload request for file=%s (size=%d bytes), user_id=%s folder_id=%s",
             file.filename,
             len(file_bytes),
             current_user.user_id,
+            folder_id,
         )
 
         doc_metadata, chunks = await ingestion_service.ingest_and_index(
@@ -47,6 +49,7 @@ async def upload_and_ingest_file(
             user_id=current_user.user_id,
             subject=subject,
             language=language,
+            folder_id=folder_id,
             persist_to_db=True,
             index_for_retrieval=True,
             user_config=None,
@@ -71,6 +74,7 @@ async def upload_and_ingest_file(
                 "original_filename": file.filename,
                 "subject": subject,
                 "language": language,
+                "folder_id": folder_id,
             },
         )
 

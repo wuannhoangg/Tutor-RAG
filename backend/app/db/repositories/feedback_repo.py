@@ -18,6 +18,15 @@ def _to_dict(obj: Any) -> Dict[str, Any]:
     return {key: value for key, value in vars(obj).items() if not key.startswith("_")}
 
 
+def _safe_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 class FeedbackRepository:
     """Repository for handling user feedback records."""
 
@@ -26,8 +35,10 @@ class FeedbackRepository:
 
         new_feedback = models.Feedback(
             user_id=payload.get("user_id"),
+            answer_id=_safe_int(payload.get("answer_id")),
             query_id=payload.get("query_id"),
-            feedback_text=payload.get("feedback_text") or payload.get("text") or "",
+            rating=_safe_int(payload.get("rating")),
+            comment=payload.get("comment") or payload.get("feedback_text") or payload.get("text"),
         )
 
         try:

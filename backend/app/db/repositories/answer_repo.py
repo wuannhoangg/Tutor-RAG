@@ -27,6 +27,15 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
+def _safe_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _normalize_citations(value: Any) -> List[Dict[str, Any]]:
     if value is None:
         return []
@@ -62,15 +71,24 @@ class AnswerRepository:
             await db.flush()
 
             for citation in _normalize_citations(payload.get("citations")):
+                citation_payload = dict(citation)
+                snippet = citation_payload.pop("snippet", None) or citation_payload.pop("text", None)
+
+                extra_metadata = citation_payload.get("metadata") or {}
+                if not isinstance(extra_metadata, dict):
+                    extra_metadata = {"raw_metadata": extra_metadata}
+
+                if snippet:
+                    extra_metadata["snippet"] = snippet
+
                 db.add(
                     models.Citation(
                         answer_id=new_answer.answer_id,
                         document_id=citation.get("document_id"),
                         chunk_id=citation.get("chunk_id"),
-                        page_start=citation.get("page_start"),
-                        page_end=citation.get("page_end"),
-                        snippet=citation.get("snippet") or citation.get("text"),
-                        extra_metadata=citation.get("metadata") or citation,
+                        page_start=_safe_int(citation.get("page_start")),
+                        page_end=_safe_int(citation.get("page_end")),
+                        extra_metadata=extra_metadata or citation_payload,
                     )
                 )
 
@@ -86,8 +104,10 @@ class AnswerRepository:
 
         new_feedback = models.Feedback(
             user_id=payload.get("user_id"),
+            answer_id=_safe_int(payload.get("answer_id")),
             query_id=payload.get("query_id"),
-            feedback_text=payload.get("feedback_text") or payload.get("text") or "",
+            rating=_safe_int(payload.get("rating")),
+            comment=payload.get("comment") or payload.get("feedback_text") or payload.get("text"),
         )
 
         try:

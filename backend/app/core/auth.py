@@ -9,9 +9,13 @@ from fastapi import Depends, Header, HTTPException, status
 from jwt import ExpiredSignatureError, InvalidTokenError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import logging
 from app.core.config import get_settings
 from app.db import models
 from app.db.base import get_async_session
+
+
+logger = logging.logger.getChild("auth")
 
 
 @dataclass
@@ -97,6 +101,7 @@ async def _verify_with_supabase_auth_server(token: str) -> AuthenticatedUser:
                 },
             )
     except httpx.HTTPError as exc:
+        logger.exception("Failed to verify token with Supabase Auth server.")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Failed to verify token with Supabase Auth server.",
@@ -149,6 +154,7 @@ async def _ensure_local_user_row(
                 )
             )
             await db.commit()
+            logger.info("Created local user row user_id=%s", user.user_id)
             return
 
         updated = False
@@ -158,9 +164,15 @@ async def _ensure_local_user_row(
 
         if updated:
             await db.commit()
+            logger.info("Updated local user row user_id=%s", user.user_id)
 
     except Exception as exc:
         await db.rollback()
+        logger.exception(
+            "Failed to synchronize authenticated user with local database. user_id=%s email=%s",
+            user.user_id,
+            user.email,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to synchronize authenticated user with local database.",

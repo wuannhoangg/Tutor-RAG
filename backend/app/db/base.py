@@ -21,6 +21,11 @@ engine = create_async_engine(
     pool_pre_ping=True,   # Kiểm tra xem DB còn sống không trước khi xài
     pool_recycle=300,     # Chủ động làm mới kết nối sau mỗi 5 phút (300 giây)
     pool_timeout=60,
+
+    connect_args={
+        "prepared_statement_cache_size": 0,
+        "statement_cache_size": 0,
+    }
 )
 
 async_session_factory = async_sessionmaker(

@@ -8,18 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db.repositories.chunk_repo import ChunkRepository
 from ..db.repositories.document_repo import DocumentRepository
 from ..schemas.chunk import Chunk
-from ..schemas.document import DocumentCreate, DocumentMetadata
+from ..schemas.document import DocumentMetadata
 from ..schemas.llm_config import LLMConfig
 from ..services.document_service import DocumentService
 from .retrieval_service import RetrievalService, get_retrieval_service
 
 
 class IngestionService:
-    """
-    High-level ingestion flow:
-    document processing -> optional DB persistence -> optional retrieval indexing.
-    """
-
     def __init__(
         self,
         doc_service: Optional[DocumentService] = None,
@@ -40,6 +35,7 @@ class IngestionService:
         user_id: str = "system_user",
         subject: Optional[str] = None,
         language: str = "vi",
+        folder_id: Optional[str] = None,
         persist_to_db: bool = True,
         index_for_retrieval: bool = True,
         user_config: Optional[LLMConfig] = None,
@@ -58,8 +54,9 @@ class IngestionService:
         actual_chunks = [chunk for chunk in chunks if chunk.text.strip()]
 
         if persist_to_db:
-            doc_create = DocumentCreate.model_validate(doc_metadata.model_dump())
-            stored_doc = await self.document_repo.create(doc_create, db)
+            doc_payload = doc_metadata.model_dump()
+            doc_payload["folder_id"] = folder_id
+            stored_doc = await self.document_repo.create(doc_payload, db)
             doc_metadata.document_id = stored_doc.document_id
 
             for chunk in actual_chunks:

@@ -37,7 +37,6 @@ def _normalize_provider_name(provider: Optional[str]) -> str:
         "ollama": "ollama",
         "lm_studio": "lm_studio",
         "openai_compatible": "openai_compatible",
-        "local_runtime": "openai_compatible",
     }
     return aliases.get(key, key)
 
@@ -59,7 +58,6 @@ def _normalize_model_identifier(provider: str, model: str) -> str:
     if provider == "ollama":
         return f"ollama/{clean_model}"
 
-    # lm_studio / openai_compatible / custom gateways
     return clean_model
 
 
@@ -100,25 +98,9 @@ def resolve_llm_config(request_config: Optional[LLMConfig]) -> ResolvedLLMConfig
         )
 
     if request_config.mode == "local_runtime":
-        if not request_config.base_url and _normalize_provider_name(request_config.provider) != "ollama":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="local_runtime mode requires base_url.",
-            )
-        if not request_config.model:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="local_runtime mode requires model.",
-            )
-
-        provider = _normalize_provider_name(request_config.provider or "openai_compatible")
-        model = _normalize_model_identifier(provider, request_config.model)
-
-        return ResolvedLLMConfig(
-            provider=provider,
-            api_key=_clean_optional(request_config.api_key),
-            base_url=_clean_optional(request_config.base_url),
-            model=model,
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="local_runtime mode is disabled on this deployment.",
         )
 
     raise HTTPException(
@@ -126,8 +108,8 @@ def resolve_llm_config(request_config: Optional[LLMConfig]) -> ResolvedLLMConfig
         detail=f"Unsupported llm mode: {request_config.mode}",
     )
 
+
 def resolve_ingestion_llm_config() -> ResolvedLLMConfig:
-    """Hàm phân giải config dành riêng cho quá trình trích xuất lúc up file."""
     settings = get_settings()
     provider = _normalize_provider_name(settings.PLATFORM_LLM_PROVIDER)
     model = _normalize_model_identifier(provider, settings.INGESTION_LLM_MODEL)
